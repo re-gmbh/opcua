@@ -19,7 +19,14 @@ impl fmt::Display for AttributeIdError {
 
 impl Error for AttributeIdError {}
 
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
+/// AttributeId identifies an attribute of an OPC UA node
+/// In order to get a string representation, it implements `serde::Serialize`,
+/// which you can use as such:
+/// ```
+/// # use opcua_types::AttributeId;
+/// assert_eq!(serde_plain::to_string(&AttributeId::NodeClass).unwrap(), "NodeClass");
+/// ```
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize)]
 pub enum AttributeId {
     NodeId = 1,
     NodeClass = 2,
