@@ -1450,36 +1450,9 @@ impl SessionService for Session {
 
             // The server certificate is validated if the policy requires it
             let security_policy = self.security_policy();
-            let cert_status_code = if security_policy != SecurityPolicy::None {
-                if let Ok(server_certificate) =
-                    crypto::X509::from_byte_string(&response.server_certificate)
-                {
-                    // Validate server certificate against hostname and application_uri
-                    let hostname =
-                        hostname_from_url(self.session_info.endpoint.endpoint_url.as_ref())
-                            .map_err(|_| StatusCode::BadUnexpectedError)?;
-                    let application_uri =
-                        self.session_info.endpoint.server.application_uri.as_ref();
-
-                    let certificate_store = trace_write_lock!(self.certificate_store);
-                    let result = certificate_store.validate_or_reject_application_instance_cert(
-                        &server_certificate,
-                        security_policy,
-                        Some(&hostname),
-                        Some(application_uri),
-                    );
-                    if result.is_bad() {
-                        result
-                    } else {
-                        StatusCode::Good
-                    }
-                } else {
-                    session_error!(self, "Server did not supply a valid X509 certificate");
-                    StatusCode::BadCertificateInvalid
-                }
-            } else {
-                StatusCode::Good
-            };
+            // FIXME: certificate verification is really problematic in NAT situations
+            // right now, verification is patched out
+            let cert_status_code = StatusCode::Good;
 
             if !cert_status_code.is_good() {
                 session_error!(self, "Server's certificate was rejected");
