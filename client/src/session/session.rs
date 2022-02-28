@@ -2157,6 +2157,7 @@ impl ViewService for Session {
     fn browse(
         &self,
         nodes_to_browse: &[BrowseDescription],
+        requested_max_references_per_node: Option<u32>
     ) -> Result<Option<Vec<BrowseResult>>, StatusCode> {
         if nodes_to_browse.is_empty() {
             session_error!(self, "browse, was not supplied with any nodes to browse");
@@ -2169,8 +2170,8 @@ impl ViewService for Session {
                     timestamp: DateTime::null(),
                     view_version: 0,
                 },
-                requested_max_references_per_node: 1000,
                 nodes_to_browse: Some(nodes_to_browse.to_vec()),
+                requested_max_references_per_node: requested_max_references_per_node.unwrap_or(1000),
             };
             let response = self.send_request(request)?;
             if let SupportedMessage::BrowseResponse(response) = response {
