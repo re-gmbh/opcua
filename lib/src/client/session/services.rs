@@ -324,6 +324,8 @@ pub trait ViewService: Service {
     /// # Arguments
     ///
     /// * `nodes_to_browse` - A list of [`BrowseDescription`] describing nodes to browse.
+    /// * `requested_max_references_per_node` - override the default of 1000 nodes as a work-around
+    ///                                         for servers that fail to encode large responses
     ///
     /// # Returns
     ///
@@ -338,6 +340,7 @@ pub trait ViewService: Service {
     fn browse(
         &self,
         nodes_to_browse: &[BrowseDescription],
+        requested_max_references_per_node: Option<u32>
     ) -> Result<Option<Vec<BrowseResult>>, StatusCode>;
 
     /// Continue to discover references to nodes by sending continuation points in a [`BrowseNextRequest`]
