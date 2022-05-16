@@ -223,21 +223,11 @@ impl Server {
     /// Runs the supplied server and blocks until it completes either by aborting or
     /// by error.
     pub fn run_server(server: Arc<RwLock<Server>>) {
-        let single_threaded_executor = {
-            let server = trace_read_lock!(server);
-            let server_state = trace_read_lock!(server.server_state);
-            let config = trace_read_lock!(server_state.config);
-            config.performance.single_threaded_executor
-        };
         let server_task = Self::new_server_task(server);
-        // Launch
-        let mut builder = if !single_threaded_executor {
-            tokio::runtime::Builder::new_multi_thread()
-        } else {
-            tokio::runtime::Builder::new_current_thread()
-        };
-        let runtime = builder.enable_all().build().unwrap();
-        Self::run_server_on_runtime(runtime, server_task, true);
+        Self::run_server_on_runtime(
+            tokio::runtime::Handle::current(),
+            server_task,
+            true);
     }
 
     /// Allow the server to be run on a caller supplied runtime. If block is set, the task
@@ -245,7 +235,7 @@ impl Server {
     /// returned by the function. Spawning might be suitable if the runtime is being used for other
     /// async tasks.
     pub fn run_server_on_runtime<F>(
-        runtime: tokio::runtime::Runtime,
+        runtime_handle: tokio::runtime::Handle,
         server_task: F,
         block: bool,
     ) -> Option<tokio::task::JoinHandle<<F as futures::Future>::Output>>
@@ -254,11 +244,11 @@ impl Server {
         F::Output: Send + 'static,
     {
         if block {
-            runtime.block_on(server_task);
+            runtime_handle.block_on(server_task);
             info!("Server has finished");
             None
         } else {
-            Some(runtime.spawn(server_task))
+            Some(runtime_handle.spawn(server_task))
         }
     }
 

@@ -137,10 +137,6 @@ pub struct Session {
     session_retry_policy: Arc<Mutex<SessionRetryPolicy>>,
     /// Ignore clock skew between the client and the server.
     ignore_clock_skew: bool,
-    /// Single threaded executor flag (for TCP transport)
-    single_threaded_executor: bool,
-    /// Tokio runtime
-    runtime: Arc<Mutex<tokio::runtime::Runtime>>,
 }
 
 impl Drop for Session {
@@ -172,7 +168,6 @@ impl Session {
         session_retry_policy: SessionRetryPolicy,
         decoding_options: DecodingOptions,
         ignore_clock_skew: bool,
-        single_threaded_executor: bool,
     ) -> Session
     where
         T: Into<UAString>,
@@ -194,15 +189,8 @@ impl Session {
             secure_channel.clone(),
             session_state.clone(),
             message_queue.clone(),
-            single_threaded_executor,
         );
         let subscription_state = Arc::new(RwLock::new(SubscriptionState::new()));
-
-        // This runtime is single threaded. The one for the transport may be multi-threaded
-        let runtime = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .unwrap();
 
         Session {
             application_description,
@@ -216,8 +204,6 @@ impl Session {
             message_queue,
             session_retry_policy: Arc::new(Mutex::new(session_retry_policy)),
             ignore_clock_skew,
-            single_threaded_executor,
-            runtime: Arc::new(Mutex::new(runtime)),
         }
     }
 
@@ -240,7 +226,6 @@ impl Session {
             self.secure_channel.clone(),
             self.session_state.clone(),
             self.message_queue.clone(),
-            self.single_threaded_executor,
         );
     }
 
@@ -702,13 +687,7 @@ impl Session {
                 Self::session_task(session, sleep_interval, rx).await;
             }
         };
-        // Spawn the task on the alloted runtime
-        let runtime = {
-            let session = trace_read_lock!(session);
-            session.runtime.clone()
-        };
-        let runtime = trace_lock!(runtime);
-        runtime.block_on(task);
+        tokio::runtime::Handle::current().block_on(task);
     }
 
     /// Polls on the session which basically dispatches any pending
@@ -807,8 +786,7 @@ impl Session {
         );
 
         let id = format!("session-activity-thread-{:?}", thread::current().id());
-        let runtime = trace_lock!(self.runtime);
-        runtime.spawn(async move {
+        tokio::runtime::Handle::current().spawn(async move {
                 register_runtime_component!(&id);
                 // The timer runs at a higher frequency timer loop to terminate as soon after the session
                 // state has terminated. Each time it runs it will test if the interval has elapsed or not.

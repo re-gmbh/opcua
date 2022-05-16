@@ -394,7 +394,6 @@ impl Client {
                 self.session_retry_policy.clone(),
                 self.decoding_options(),
                 self.config.performance.ignore_clock_skew,
-                self.config.performance.single_threaded_executor,
             )));
             Ok(session)
         }
@@ -482,7 +481,6 @@ impl Client {
                 self.session_retry_policy.clone(),
                 self.decoding_options(),
                 self.config.performance.ignore_clock_skew,
-                self.config.performance.single_threaded_executor,
             );
             session.connect()?;
             let result = session.get_endpoints()?;

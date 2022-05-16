@@ -45,6 +45,7 @@ use crate::{
     session::session_state::{ConnectionState, ConnectionStateMgr, SessionState},
 };
 use tokio::io::AsyncWriteExt;
+use tokio::runtime::Handle;
 
 //todo move this struct to core module
 #[derive(Debug)]
@@ -229,8 +230,6 @@ pub(crate) struct TcpTransport {
     connection_state: ConnectionStateMgr,
     /// Message queue for requests / responses
     message_queue: Arc<RwLock<MessageQueue>>,
-    /// Tokio runtime
-    runtime: Arc<Mutex<tokio::runtime::Runtime>>,
 }
 
 impl Drop for TcpTransport {
@@ -249,21 +248,10 @@ impl TcpTransport {
         secure_channel: Arc<RwLock<SecureChannel>>,
         session_state: Arc<RwLock<SessionState>>,
         message_queue: Arc<RwLock<MessageQueue>>,
-        single_threaded_executor: bool,
     ) -> TcpTransport {
         let connection_state = {
             let session_state = trace_read_lock!(session_state);
             session_state.connection_state()
-        };
-
-        let runtime = {
-            let mut builder = if !single_threaded_executor {
-                tokio::runtime::Builder::new_multi_thread()
-            } else {
-                tokio::runtime::Builder::new_current_thread()
-            };
-
-            builder.enable_all().build().unwrap()
         };
 
         TcpTransport {
@@ -271,7 +259,6 @@ impl TcpTransport {
             secure_channel,
             connection_state,
             message_queue,
-            runtime: Arc::new(Mutex::new(runtime)),
         }
     }
 
@@ -328,11 +315,9 @@ impl TcpTransport {
             )
         };
 
-        let runtime = self.runtime.clone();
         thread::spawn(move || {
             debug!("Client tokio tasks are starting for connection");
-            let runtime = trace_lock!(runtime);
-            runtime.block_on(async move {
+            Handle::current().block_on(async move {
                 connection_task.await;
                 debug!("Client tokio tasks have stopped for connection");
             });
