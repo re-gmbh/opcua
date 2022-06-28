@@ -1,18 +1,18 @@
 # Changelog
 
+## 0.10
+- Starting from 0.10, OPC UA for Rust is a single crate with features to enable client, server and some other optional extras. What this means is
+  that `opcua_server::` becomes `opcua::server`, `opcua_client` becomes `opcua::client` and so on. Now you only reference `opcua` from your `Cargo.toml`.
+- Replace Appveyor and Travis with Github Actions for CI/CD pipeline
+
 ## 0.9
-- Check that the server's key length is sufficient for every endpoint it is configured for
 - Multiple chunk support in client and server, sending and receiving.
+- Upgrade from Tokio 0.1 to 1.x long term support and use `async` / `await` semantics to simplify tasks
 - Support `Aes256-Sha256-RsaPss` security policy
 - Support `rsa-oaep-sha2-256` encryption for identity tokens
+- Check that the server's key length is sufficient for every endpoint it is configured for
+- Improve client performance by removing polling loop sleep interval and using oneshot channels
 - Compliance improvements
-- Upgrade from Tokio 0.1 to 1.8.x long term support
-
-### Planned
-
-- More asynchronous actions internal to the server and client, possibly also the client api and some callbacks. 
-    - On the server side certain service calls could be handled asynchronously and not in order, whereas some others cannot. 
-    At the moment messages are processed in the order received, even for potentially lengthy operations such as reads & writes.
 
 ## 0.8
 - Numerous OPC UA compliance fixes with emphasis on nano / micro profile server compliance.
@@ -82,7 +82,7 @@ folder's [README](./tools/schema/README.md) on how to do it.
 - SetTriggering and SetMonitoringMode added to the Monitored Item service set
 - TransferSubscriptions service is implemented as a stub. Most clients will see the error response and failover
   to manually reconstructing their subscription state.
-- New `web-client` sample is a OPCUA client that provides a simple websocket connect/disconnect/subscribe interface that
+- New `web-client` sample is a OPC UA client that provides a simple websocket connect/disconnect/subscribe interface that
   streams notifications to a browser.
 - Support `vendored-openssl` feature of OpenSSL (see [setup](./docs/setup.md) documentation.
 
@@ -187,12 +187,12 @@ folder's [README](./tools/schema/README.md) on how to do it.
 ## 0.1 initial release 
 - Nano implementation
 
-
 # More future work
   
 This work is note earmarked for any release and is aspirational in nature:
 
 ## Short term
+
 - identify issue with monitored items stalling sometimes, spurious acknowledgment errors on some clients
 - Session restore after disconnect in server. The server has to stash sessions that were 
   abnormally disconnected so the session state can be restored if a new connection provides the token.
@@ -203,9 +203,14 @@ This work is note earmarked for any release and is aspirational in nature:
 - ReadValueId and HistoryReadValueId should check the data_encoding field, validate it and attempt
     to return the DataValue with the value encoding as per spec.
 - ReadValueId should check the index_range field to return an element or range of elements from an array.
+- Certificate should support .pem format, or allow either .pem or .der. A .pem certificate can have a chain of 
+    signatures rather than just a single signer.
   
 ## Longer term
 
+- More asynchronous actions internal to the server and client, possibly also the client api and some callbacks. 
+    - On the server side certain service calls could be handled asynchronously and not in order, whereas some others cannot. 
+    At the moment messages are processed in the order received, even for potentially lengthy operations such as reads & writes.
 - User-level permission model, i.e. ability to limit access to address space based on identity
 - Replace more OpenSSL with a native Rust equivalent library. Must support all the crypto, hashing / digest and key
   creation APIs required by the lib. See this [doc](./docs/crypto.md) for the effort required.
