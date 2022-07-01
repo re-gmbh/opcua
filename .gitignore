@@ -9,3 +9,4 @@ log/
 /samples/server.test.conf
 /integration/pki-client
 /integration/pki-server
+/lib/pki_user_name_pass_token/
