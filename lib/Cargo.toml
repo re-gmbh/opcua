@@ -21,6 +21,8 @@ appveyor = { repository = "locka99/opcua" }
 [features]
 default = ["server", "client"]
 all = ["server", "client", "console-logging", "http"]
+# Async Client default settings
+async-client = []
 # This is for CI/CD testing on platforms with unresolved OpenSSL deps, don't use otherwise.
 test-vendored-openssl = ["all", "vendored-openssl"]
 # Server default settings
@@ -41,6 +43,7 @@ vendored-openssl = ["openssl/vendored"]
 http = ["actix-web"]
 
 [dependencies]
+async-trait = "0.1"
 log = "0.4"
 chrono = { version = "0.4", features = ["serde"] }
 # Enable deadlock_detection if there are any deadlocks in sync code

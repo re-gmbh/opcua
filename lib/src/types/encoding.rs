@@ -59,7 +59,7 @@ impl DepthLock {
 
 /// Depth gauge is used on potentially recursive structures like Variant & ExtensionObject during
 /// decoding to limit the depth the decoder will go before giving up.
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct DepthGauge {
     /// Maximum decoding depth for recursive elements. Triggers when current depth equals max depth.
     pub(crate) max_depth: usize,
