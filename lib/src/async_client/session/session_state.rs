@@ -9,6 +9,7 @@ use std::{
     },
     u32,
 };
+use std::fmt::Debug;
 
 use chrono::Duration;
 use tokio::{
@@ -327,7 +328,7 @@ impl SessionState {
         request: T,
     ) -> Result<SupportedMessage, StatusCode>
     where
-        T: Into<SupportedMessage>,
+        T: Into<SupportedMessage> + std::fmt::Debug,
     {
         // A channel is created to receive the response
         let (sender, receiver) = mpsc::channel(1);
@@ -360,7 +361,7 @@ impl SessionState {
         sender: Option<Sender<SupportedMessage>>,
     ) -> Result<u32, StatusCode>
     where
-        T: Into<SupportedMessage>,
+        T: Into<SupportedMessage> + std::fmt::Debug,
     {
         let request = request.into();
         match request {

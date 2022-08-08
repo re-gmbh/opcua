@@ -1252,6 +1252,16 @@ impl Session {
                     let _ = session_state.async_publish();
                 }
             }
+            SupportedMessage::ReadResponse(response) => {
+                // keep-alive functionality often sends a request and doesn't handle it
+                // deal with it here so it doesn't create spurious error messages about
+                // unhandled responses
+                if response.as_ref().results.as_ref().unwrap().len() == 0 {
+                    trace!("Empty ReadResponse, assuming keep-alive");
+                } else {
+                    error!("Unexpected, non-keep-alive read response: {:?}", response);
+                }
+            }
             SupportedMessage::ServiceFault(response) => {
                 let service_result = response.response_header.service_result;
                 session_debug!(
@@ -1282,7 +1292,7 @@ impl Session {
                 }
             }
             _ => {
-                info!("{} unhandled response", self.session_id());
+                info!("{} unhandled response: {:?}", self.session_id(), response);
             }
         }
     }
@@ -1312,7 +1322,7 @@ impl Service for Session {
     /// Synchronously sends a request. The return value is the response to the request
     async fn send_request<T>(&self, request: T) -> Result<SupportedMessage, StatusCode>
     where
-        T: Into<SupportedMessage> + Send,
+        T: Into<SupportedMessage> + Send + std::fmt::Debug,
     {
         let mut session_state = trace_write_lock!(self.session_state);
         session_state.send_request(request).await
@@ -1325,7 +1335,7 @@ impl Service for Session {
         sender: Option<Sender<SupportedMessage>>,
     ) -> Result<u32, StatusCode>
     where
-        T: Into<SupportedMessage>,
+        T: Into<SupportedMessage> + std::fmt::Debug,
     {
         let mut session_state = trace_write_lock!(self.session_state);
         session_state.async_send_request(request, sender)
