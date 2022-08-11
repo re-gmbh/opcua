@@ -3,6 +3,7 @@
 // Copyright (C) 2017-2022 Adam Lock
 
 use std::collections::HashMap;
+use std::time::Duration;
 
 use tokio::time::Instant;
 
@@ -86,6 +87,13 @@ impl SubscriptionState {
                 subscription.set_publishing_enabled(publishing_enabled);
             }
         });
+    }
+
+    pub(crate) fn minimum_publishing_interval(&self) -> Option<Duration> {
+        self.subscriptions.values()
+            .map({ |s: &Subscription| s.publishing_interval() })
+            .reduce(|a, b| if a.partial_cmp(&b).unwrap().is_le() { a } else { b} )
+            .map(|float_val| Duration::from_millis(float_val as u64))
     }
 
     pub(crate) fn on_data_change(

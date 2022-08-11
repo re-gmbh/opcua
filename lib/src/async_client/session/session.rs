@@ -818,6 +818,8 @@ impl Session {
     /// Start a task that will periodically send a publish request to keep the subscriptions alive.
     /// The request rate will be 3/4 of the shortest (revised publishing interval * the revised keep
     /// alive count) of all subscriptions that belong to a single session.
+    /// This is the strategy outlined for high-latency networks in the OPC UA reference at
+    /// https://reference.opcfoundation.org/v104/Core/docs/Part4/5.13.5/
     fn spawn_subscription_activity_task(&self) {
         session_debug!(self, "spawn_subscription_activity_task",);
 
@@ -839,7 +841,6 @@ impl Session {
             let mut timer = interval(Duration::from_millis(MIN_SUBSCRIPTION_ACTIVITY_MS));
 
             let mut last_timeout: Instant;
-            let mut subscription_activity_interval: Duration;
 
             loop {
                 timer.tick().await;
@@ -849,15 +850,15 @@ impl Session {
                     break;
                 }
 
-                if let (Some(keep_alive_timeout), last_publish_request) = {
+                if let (Some(subscription_interval), last_publish_request) = {
                     let subscription_state = trace_read_lock!(subscription_state);
                     (
-                        subscription_state.keep_alive_timeout(),
+                        subscription_state.minimum_publishing_interval(),
+                        // subscription_state.keep_alive_timeout(),
                         subscription_state.last_publish_request(),
                     )
                 } {
-                    subscription_activity_interval =
-                        Duration::from_millis((keep_alive_timeout / 4) * 3);
+                    //let subscription_interval = Duration::from_millis(subscription_interval/ 4) * 3;
                     last_timeout = last_publish_request;
 
                     // Get the time now
@@ -865,7 +866,7 @@ impl Session {
 
                     // Calculate to interval since last check
                     let interval = now - last_timeout;
-                    if interval > subscription_activity_interval {
+                    if interval > subscription_interval {
                         let mut session_state = trace_write_lock!(session_state);
                         let _ = session_state.async_publish();
                     }
