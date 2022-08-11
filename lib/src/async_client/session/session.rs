@@ -7,14 +7,25 @@
 //!
 //! The session also has async functionality but that is reserved for publish requests on subscriptions
 //! and events.
-use std::{cmp, collections::HashSet, result::Result, str::FromStr, sync::Arc, thread};
-
 use async_trait::async_trait;
+use std::{cmp, collections::HashSet, result::Result, str::FromStr, sync::Arc, thread};
 use tokio::{
     sync::{mpsc::Sender, oneshot},
     time::{interval, sleep, Duration, Instant},
 };
 
+use crate::async_client::{
+    callbacks::{OnConnectionStatusChange, OnSessionClosed, OnSubscriptionNotification},
+    client::IdentityToken,
+    comms::tcp_transport::TcpTransport,
+    message_queue::MessageQueue,
+    process_service_result, process_unexpected_response,
+    session::services::*,
+    session::session_state::{ConnectionState, SessionState},
+    session_retry_policy::{Answer, SessionRetryPolicy},
+    subscription::{self, Subscription},
+    subscription_state::SubscriptionState,
+};
 use crate::core::{
     comms::{
         secure_channel::{Role, SecureChannel},
@@ -30,19 +41,6 @@ use crate::crypto::{
 use crate::sync::*;
 use crate::types::{node_ids::ObjectId, status_code::StatusCode, *};
 use crate::{deregister_runtime_component, register_runtime_component};
-
-use crate::async_client::{
-    callbacks::{OnConnectionStatusChange, OnSessionClosed, OnSubscriptionNotification},
-    client::IdentityToken,
-    comms::tcp_transport::TcpTransport,
-    message_queue::MessageQueue,
-    process_service_result, process_unexpected_response,
-    session::services::*,
-    session::session_state::{ConnectionState, SessionState},
-    session_retry_policy::{Answer, SessionRetryPolicy},
-    subscription::{self, Subscription},
-    subscription_state::SubscriptionState,
-};
 
 macro_rules! session_warn {
     ($session: expr, $($arg:tt)*) =>  {
@@ -863,7 +861,7 @@ impl Session {
 
                     // Get the time now
                     let now = Instant::now();
-
+                    let subscription_interval = subscription_interval + Duration::from_millis(100);
                     // Calculate to interval since last check
                     let interval = now - last_timeout;
                     if interval > subscription_interval {
@@ -1306,7 +1304,7 @@ impl Session {
 
         match certificate_store.read_own_cert_and_pkey_optional() {
             (Some(certificate), _) => certificate.as_byte_string(),
-            _ => ByteString::null()
+            _ => ByteString::null(),
         }
     }
 }
