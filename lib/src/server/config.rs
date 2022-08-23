@@ -398,8 +398,6 @@ impl ServerEndpoint {
     }
 
     pub fn is_valid(&self, id: &str, user_tokens: &BTreeMap<String, ServerUserToken>) -> bool {
-        let mut valid = true;
-
         // Validate that the user token ids exist
         for id in &self.user_token_ids {
             // Skip anonymous
@@ -408,42 +406,46 @@ impl ServerEndpoint {
             }
             if !user_tokens.contains_key(id) {
                 error!("Cannot find user token with id {}", id);
-                valid = false;
+                return false;
             }
         }
 
         if let Some(ref password_security_policy) = self.password_security_policy {
-            let password_security_policy =
-                SecurityPolicy::from_str(password_security_policy).unwrap();
-            if password_security_policy == SecurityPolicy::Unknown {
+            if SecurityPolicy::from_str(password_security_policy).is_err() {
                 error!("Endpoint {} is invalid. Password security policy \"{}\" is invalid. Valid values are None, Basic128Rsa15, Basic256, Basic256Sha256", id, password_security_policy);
-                valid = false;
+                return false;
             }
         }
 
         // Validate the security policy and mode
-        let security_policy = SecurityPolicy::from_str(&self.security_policy).unwrap();
+        let security_policy = SecurityPolicy::from_str(&self.security_policy);
         let security_mode = MessageSecurityMode::from(self.security_mode.as_ref());
-        if security_policy == SecurityPolicy::Unknown {
+        if security_policy.is_err() {
             error!("Endpoint {} is invalid. Security policy \"{}\" is invalid. Valid values are None, Basic128Rsa15, Basic256, Basic256Sha256, Aes128Sha256RsaOaep, Aes256Sha256RsaPss,", id, self.security_policy);
-            valid = false;
-        } else if security_mode == MessageSecurityMode::Invalid {
+            return false;
+        }
+
+        let security_policy = security_policy.unwrap();
+
+        if security_mode == MessageSecurityMode::Invalid {
             error!("Endpoint {} is invalid. Security mode \"{}\" is invalid. Valid values are None, Sign, SignAndEncrypt", id, self.security_mode);
-            valid = false;
-        } else if (security_policy == SecurityPolicy::None
+            return false;
+        }
+        if (security_policy == SecurityPolicy::None
             && security_mode != MessageSecurityMode::None)
             || (security_policy != SecurityPolicy::None
                 && security_mode == MessageSecurityMode::None)
         {
             error!("Endpoint {} is invalid. Security policy and security mode must both contain None or neither of them should (1).", id);
-            valid = false;
-        } else if security_policy != SecurityPolicy::None
+            return false;
+        }
+        if security_policy != SecurityPolicy::None
             && security_mode == MessageSecurityMode::None
         {
             error!("Endpoint {} is invalid. Security policy and security mode must both contain None or neither of them should (2).", id);
-            valid = false;
+            return false;
         }
-        valid
+        true
     }
 
     pub fn security_policy(&self) -> SecurityPolicy {

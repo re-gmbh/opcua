@@ -494,43 +494,43 @@ impl Session {
     pub fn connect_no_retry(&self) -> Result<(), StatusCode> {
         let endpoint_url = self.session_info.endpoint.endpoint_url.clone();
         info!("Connect");
-        let security_policy =
-            SecurityPolicy::from_str(self.session_info.endpoint.security_policy_uri.as_ref())
-                .unwrap();
-        if security_policy == SecurityPolicy::Unknown {
-            session_error!(
+        match SecurityPolicy::from_str(self.session_info.endpoint.security_policy_uri.as_ref()) {
+            Err(msg) => {
+                session_error!(
                 self,
-                "connect, security policy \"{}\" is unknown",
-                self.session_info.endpoint.security_policy_uri.as_ref()
+                "{}",
+                msg
             );
-            Err(StatusCode::BadSecurityPolicyRejected)
-        } else {
-            let (cert, key) = {
-                let certificate_store = trace_write_lock!(self.certificate_store);
-                certificate_store.read_own_cert_and_pkey_optional()
-            };
+                Err(StatusCode::BadSecurityPolicyRejected)
+            },
+            Ok(security_policy) => {
+                let (cert, key) = {
+                    let certificate_store = trace_write_lock!(self.certificate_store);
+                    certificate_store.read_own_cert_and_pkey_optional()
+                };
 
-            {
-                let mut secure_channel = trace_write_lock!(self.secure_channel);
-                secure_channel.set_private_key(key);
-                secure_channel.set_cert(cert);
-                secure_channel.set_security_policy(security_policy);
-                secure_channel.set_security_mode(self.session_info.endpoint.security_mode);
-                let _ = secure_channel.set_remote_cert_from_byte_string(
-                    &self.session_info.endpoint.server_certificate,
-                );
-                info!("Security policy = {:?}", security_policy);
-                info!(
+                {
+                    let mut secure_channel = trace_write_lock!(self.secure_channel);
+                    secure_channel.set_private_key(key);
+                    secure_channel.set_cert(cert);
+                    secure_channel.set_security_policy(security_policy);
+                    secure_channel.set_security_mode(self.session_info.endpoint.security_mode);
+                    let _ = secure_channel.set_remote_cert_from_byte_string(
+                        &self.session_info.endpoint.server_certificate,
+                    );
+                    info!("Security policy = {:?}", security_policy);
+                    info!(
                     "Security mode = {:?}",
                     self.session_info.endpoint.security_mode
                 );
-            }
+                }
 
-            // Transport's tokio runtime is made here, not in transport
-            self.transport.connect(endpoint_url.as_ref())?;
-            self.open_secure_channel()?;
-            self.on_connection_status_change(true);
-            Ok(())
+                // Transport's tokio runtime is made here, not in transport
+                self.transport.connect(endpoint_url.as_ref())?;
+                self.open_secure_channel()?;
+                self.on_connection_status_change(true);
+                Ok(())
+            }
         }
     }
 

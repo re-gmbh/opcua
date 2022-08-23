@@ -18,24 +18,24 @@ fn is_deprecated() {
 fn from_str() {
     // Invalid from_str
     assert_eq!(
-        SecurityPolicy::from_str("").unwrap(),
-        SecurityPolicy::Unknown
+        SecurityPolicy::from_str(""),
+        Err("Specified security policy \"\" is not recognized".into())
     );
     assert_eq!(
-        SecurityPolicy::from_str("none").unwrap(),
-        SecurityPolicy::Unknown
+        SecurityPolicy::from_str("none"),
+        Err("Specified security policy \"none\" is not recognized".into())
     );
     assert_eq!(
-        SecurityPolicy::from_str(" None").unwrap(),
-        SecurityPolicy::Unknown
+        SecurityPolicy::from_str(" None"),
+        Err("Specified security policy \" None\" is not recognized".into())
     );
     assert_eq!(
-        SecurityPolicy::from_str("Basic256 ").unwrap(),
-        SecurityPolicy::Unknown
+        SecurityPolicy::from_str("Basic256 "),
+        Err("Specified security policy \"Basic256 \" is not recognized".into())
     );
     assert_eq!(
-        SecurityPolicy::from_str("http://opcfoundation.org/UA/SecurityPolicy#").unwrap(),
-        SecurityPolicy::Unknown
+        SecurityPolicy::from_str("http://opcfoundation.org/UA/SecurityPolicy#"),
+        Err("Specified security policy \"http://opcfoundation.org/UA/SecurityPolicy#\" is not recognized".into())
     );
 
     // Valid from str will take either the short name or the URI

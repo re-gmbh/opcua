@@ -1,4 +1,5 @@
 use std::{self, fmt};
+use std::str::FromStr;
 
 use crate::types::{
     attribute::AttributeId,
@@ -459,6 +460,14 @@ impl<'a> From<&'a str> for MessageSecurityMode {
                 MessageSecurityMode::Invalid
             }
         }
+    }
+}
+
+impl FromStr for MessageSecurityMode {
+    type Err = String; // useful for some utilities like serde
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+       Ok(Self::from(s))
     }
 }
 

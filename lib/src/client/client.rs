@@ -204,7 +204,7 @@ impl Client {
             info!(
                 "  {} - {:?} / {:?}",
                 e.endpoint_url,
-                SecurityPolicy::from_str(e.security_policy_uri.as_ref()).unwrap(),
+                SecurityPolicy::from_str(e.security_policy_uri.as_ref()).unwrap_or(SecurityPolicy::Unknown),
                 e.security_mode
             )
         });

@@ -8,6 +8,7 @@
 #![allow(unused_attributes)]
 #![allow(non_upper_case_globals)]
 use std::io::{Read, Write};
+use std::str::FromStr;
 use crate::types::{
     encoding::*,
     status_codes::StatusCode,

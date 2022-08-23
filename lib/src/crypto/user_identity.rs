@@ -42,13 +42,8 @@ pub fn make_user_name_identity_token(
         // SecureChannel.
         channel_security_policy
     } else {
-        let security_policy =
-            SecurityPolicy::from_str(user_token_policy.security_policy_uri.as_ref()).unwrap();
-        if security_policy == SecurityPolicy::Unknown {
-            SecurityPolicy::None
-        } else {
-            security_policy
-        }
+        SecurityPolicy::from_str(user_token_policy.security_policy_uri.as_ref())
+            .unwrap_or(SecurityPolicy::None)
     };
 
     // Now it should be a matter of using the policy (or lack thereof) to encrypt the password

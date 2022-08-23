@@ -179,29 +179,28 @@ impl fmt::Display for SecurityPolicy {
 }
 
 impl FromStr for SecurityPolicy {
-    type Err = ();
+    type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(match s {
+        match s {
             constants::SECURITY_POLICY_NONE | constants::SECURITY_POLICY_NONE_URI => {
-                SecurityPolicy::None
+                Ok(SecurityPolicy::None)
             }
             basic_128_rsa_15::SECURITY_POLICY | basic_128_rsa_15::SECURITY_POLICY_URI => {
-                SecurityPolicy::Basic128Rsa15
+                Ok(SecurityPolicy::Basic128Rsa15)
             }
-            basic_256::SECURITY_POLICY | basic_256::SECURITY_POLICY_URI => SecurityPolicy::Basic256,
-            basic_256_sha_256::SECURITY_POLICY | basic_256_sha_256::SECURITY_POLICY_URI => {
-                SecurityPolicy::Basic256Sha256
-            }
+            basic_256::SECURITY_POLICY | basic_256::SECURITY_POLICY_URI => Ok(SecurityPolicy::Basic256),
+            basic_256_sha_256::SECURITY_POLICY | basic_256_sha_256::SECURITY_POLICY_URI =>
+                Ok(SecurityPolicy::Basic256Sha256),
             aes_128_sha_256_rsa_oaep::SECURITY_POLICY
-            | aes_128_sha_256_rsa_oaep::SECURITY_POLICY_URI => SecurityPolicy::Aes128Sha256RsaOaep,
+            | aes_128_sha_256_rsa_oaep::SECURITY_POLICY_URI => Ok(SecurityPolicy::Aes128Sha256RsaOaep),
             aes_256_sha_256_rsa_pss::SECURITY_POLICY
-            | aes_256_sha_256_rsa_pss::SECURITY_POLICY_URI => SecurityPolicy::Aes256Sha256RsaPss,
+            | aes_256_sha_256_rsa_pss::SECURITY_POLICY_URI => Ok(SecurityPolicy::Aes256Sha256RsaPss),
             _ => {
-                error!("Specified security policy \"{}\" is not recognized", s);
-                SecurityPolicy::Unknown
+                let msg = format!("Specified security policy \"{}\" is not recognized", s);
+                Err(msg)
             }
-        })
+        }
     }
 }
 

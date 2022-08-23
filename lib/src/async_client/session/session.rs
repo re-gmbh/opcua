@@ -509,16 +509,8 @@ impl Session {
         let endpoint_url = self.session_info.endpoint.endpoint_url.clone();
         info!("Connect");
         let security_policy =
-            SecurityPolicy::from_str(self.session_info.endpoint.security_policy_uri.as_ref())
-                .unwrap();
-        if security_policy == SecurityPolicy::Unknown {
-            session_error!(
-                self,
-                "connect, security policy \"{}\" is unknown",
-                self.session_info.endpoint.security_policy_uri.as_ref()
-            );
-            Err(StatusCode::BadSecurityPolicyRejected)
-        } else {
+            SecurityPolicy::from_str(self.session_info.endpoint.security_policy_uri.as_ref());
+        if let Ok(security_policy) = security_policy {
             let (cert, key) = {
                 let certificate_store = trace_write_lock!(self.certificate_store);
                 certificate_store.read_own_cert_and_pkey_optional()
@@ -544,6 +536,13 @@ impl Session {
             self.open_secure_channel().await?;
             self.on_connection_status_change(true);
             Ok(())
+        } else {
+            session_error!(
+                self,
+                "connect, security policy \"{}\" is unknown",
+                self.session_info.endpoint.security_policy_uri.as_ref()
+            );
+            Err(StatusCode::BadSecurityPolicyRejected)
         }
     }
 
