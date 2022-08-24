@@ -450,7 +450,7 @@ impl ServerEndpoint {
     }
 
     pub fn security_policy(&self) -> SecurityPolicy {
-        SecurityPolicy::from_str(&self.security_policy).unwrap()
+        SecurityPolicy::from_str(&self.security_policy).unwrap_or(SecurityPolicy::Unknown)
     }
 
     pub fn message_security_mode(&self) -> MessageSecurityMode {
@@ -467,14 +467,14 @@ impl ServerEndpoint {
     pub fn password_security_policy(&self) -> SecurityPolicy {
         let mut password_security_policy = self.security_policy();
         if let Some(ref security_policy) = self.password_security_policy {
-            match SecurityPolicy::from_str(security_policy).unwrap() {
-                SecurityPolicy::Unknown => {
+            match SecurityPolicy::from_str(security_policy) {
+                Err(_) => {
                     panic!(
                         "Password security policy {} is unrecognized",
                         security_policy
                     );
                 }
-                security_policy => {
+                Ok(security_policy) => {
                     password_security_policy = security_policy;
                 }
             }
