@@ -451,23 +451,20 @@ impl From<MessageSecurityMode> for String {
 
 impl<'a> From<&'a str> for MessageSecurityMode {
     fn from(str: &'a str) -> Self {
-        match str {
-            MESSAGE_SECURITY_MODE_NONE => MessageSecurityMode::None,
-            MESSAGE_SECURITY_MODE_SIGN => MessageSecurityMode::Sign,
-            MESSAGE_SECURITY_MODE_SIGN_AND_ENCRYPT => MessageSecurityMode::SignAndEncrypt,
-            _ => {
-                error!("Specified security mode \"{}\" is not recognized", str);
-                MessageSecurityMode::Invalid
-            }
-        }
+        Self::from_str(str).unwrap_or(MessageSecurityMode::Invalid)
     }
 }
 
 impl FromStr for MessageSecurityMode {
     type Err = String; // useful for some utilities like serde
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-       Ok(Self::from(s))
+    fn from_str(str: &str) -> Result<Self, Self::Err> {
+        match str {
+            MESSAGE_SECURITY_MODE_NONE => Ok(MessageSecurityMode::None),
+            MESSAGE_SECURITY_MODE_SIGN => Ok(MessageSecurityMode::Sign),
+            MESSAGE_SECURITY_MODE_SIGN_AND_ENCRYPT => Ok(MessageSecurityMode::SignAndEncrypt),
+            _ => Err(format!("Specified security mode \"{}\" is not recognized", str))
+        }
     }
 }
 

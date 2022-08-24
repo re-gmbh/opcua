@@ -419,18 +419,19 @@ impl ServerEndpoint {
 
         // Validate the security policy and mode
         let security_policy = SecurityPolicy::from_str(&self.security_policy);
-        let security_mode = MessageSecurityMode::from(self.security_mode.as_ref());
         if security_policy.is_err() {
             error!("Endpoint {} is invalid. Security policy \"{}\" is invalid. Valid values are None, Basic128Rsa15, Basic256, Basic256Sha256, Aes128Sha256RsaOaep, Aes256Sha256RsaPss,", id, self.security_policy);
             return false;
         }
-
         let security_policy = security_policy.unwrap();
 
-        if security_mode == MessageSecurityMode::Invalid {
+        let security_mode = MessageSecurityMode::from_str(self.security_mode.as_ref());
+        if security_mode.is_err() {
             error!("Endpoint {} is invalid. Security mode \"{}\" is invalid. Valid values are None, Sign, SignAndEncrypt", id, self.security_mode);
             return false;
         }
+
+        let security_mode = security_mode.unwrap();
         if (security_policy == SecurityPolicy::None
             && security_mode != MessageSecurityMode::None)
             || (security_policy != SecurityPolicy::None
@@ -453,7 +454,8 @@ impl ServerEndpoint {
     }
 
     pub fn message_security_mode(&self) -> MessageSecurityMode {
-        MessageSecurityMode::from(self.security_mode.as_ref())
+        MessageSecurityMode::from_str(self.security_mode.as_ref())
+            .unwrap_or(MessageSecurityMode::Invalid)
     }
 
     pub fn endpoint_url(&self, base_endpoint: &str) -> String {

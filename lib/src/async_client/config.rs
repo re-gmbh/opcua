@@ -257,6 +257,12 @@ impl Config for ClientConfig {
                         id, e.security_policy
                     );
                     valid = false;
+                } else if MessageSecurityMode::from_str(e.security_mode.as_ref()).is_err() {
+                    error!(
+                            "Endpoint {} security mode {} is invalid",
+                            id, e.security_mode
+                        );
+                    valid = false;
                 }
             });
         }

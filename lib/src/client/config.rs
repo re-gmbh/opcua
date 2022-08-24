@@ -255,9 +255,7 @@ impl Config for ClientConfig {
             self.endpoints.iter().for_each(|(id, e)| {
                 if SecurityPolicy::from_str(&e.security_policy).is_ok()
                 {
-                    if MessageSecurityMode::Invalid
-                        == MessageSecurityMode::from(e.security_mode.as_ref())
-                    {
+                    if MessageSecurityMode::from_str(e.security_mode.as_ref()).is_err() {
                         error!(
                             "Endpoint {} message security mode {} is invalid",
                             id, e.security_mode
