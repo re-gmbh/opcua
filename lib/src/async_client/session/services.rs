@@ -293,6 +293,9 @@ pub trait ViewService: Service {
     /// # Arguments
     ///
     /// * `nodes_to_browse` - A list of [`BrowseDescription`] describing nodes to browse.
+    /// * `maximum_nodes_per_read_limit` - the maximum number of nodes. Should correspond to the
+    ///                                    `MaxNodesPerBrowse` variable of the `OperationLimits`
+    ///                                    defined on the server.
     ///
     /// # Returns
     ///
@@ -307,6 +310,7 @@ pub trait ViewService: Service {
     async fn browse(
         &self,
         nodes_to_browse: &[BrowseDescription],
+        maximum_nodes_per_read_limit: Option<u32>,
     ) -> Result<Option<Vec<BrowseResult>>, StatusCode>;
 
     /// Continue to discover references to nodes by sending continuation points in a [`BrowseNextRequest`]

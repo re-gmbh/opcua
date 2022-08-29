@@ -96,6 +96,9 @@ impl Into<SessionInfo> for (EndpointDescription, IdentityToken) {
     }
 }
 
+/// Used when browsing nodes without consulting the servers `OperationLimits` first
+const DEFAULT_MAX_NODES_PER_BROWSE: u32 = 1000;
+
 /// A `Session` runs in a loop, which can be terminated by sending it a `SessionCommand`.
 #[derive(Debug)]
 pub enum SessionCommand {
@@ -2236,6 +2239,7 @@ impl ViewService for Session {
     async fn browse(
         &self,
         nodes_to_browse: &[BrowseDescription],
+        maximum_nodes_to_browse: Option<u32>,
     ) -> Result<Option<Vec<BrowseResult>>, StatusCode> {
         if nodes_to_browse.is_empty() {
             session_error!(self, "browse, was not supplied with any nodes to browse");
@@ -2248,7 +2252,7 @@ impl ViewService for Session {
                     timestamp: DateTime::null(),
                     view_version: 0,
                 },
-                requested_max_references_per_node: 1000,
+                requested_max_references_per_node: maximum_nodes_to_browse.unwrap_or(DEFAULT_MAX_NODES_PER_BROWSE),
                 nodes_to_browse: Some(nodes_to_browse.to_vec()),
             };
             let response = self.send_request(request).await?;
