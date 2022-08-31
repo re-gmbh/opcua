@@ -388,14 +388,6 @@ impl TcpTransport {
             )
         };
 
-        let id = {
-            let session_state = trace_read_lock!(session_state);
-            session_state.id()
-        };
-
-        let id = format!("connection-task, {}", id);
-        register_runtime_component!(&id);
-
         connection_state.set_state(ConnectionState::Connecting);
 
         match TcpStream::connect(&addr).await {
@@ -422,7 +414,6 @@ impl TcpTransport {
                             secure_channel,
                             message_queue,
                         );
-                        deregister_runtime_component!(&id);
                     }
                 };
                 // Wait for connection state to be closed
@@ -440,20 +431,10 @@ impl TcpTransport {
                 }
             }
         }
-
-        // Tell the session that the connection is finished.
-        match connection_state.state() {
-            ConnectionState::Finished(status_code) => {
-                let mut session_state = trace_write_lock!(session_state);
-                session_state.on_session_closed(status_code);
-            }
-            connection_state => {
-                error!(
-                    "Connect task is not in a finished state, state = {:?}",
-                    connection_state
-                );
-            }
-        }
+        // there used to be some code here which invoked the on_session_closed callback of the
+        // session state. Since it should be possible to re-establish the connection and transfer
+        // the session into it, closing the TCP transport must not be directly associated with
+        // closing the session.
         deregister_runtime_component!(&id);
     }
 
@@ -481,34 +462,6 @@ impl TcpTransport {
             }
         }
         write_state
-    }
-
-    fn spawn_finished_monitor_task(
-        connection_state: ConnectionStateMgr,
-        finished_flag: Arc<RwLock<bool>>,
-        id: u32,
-    ) {
-        // This task just spins around waiting for the connection to become finished. When it
-        // does it, sets a flag.
-        tokio::spawn(async move {
-            let id = format!("finished-monitor-task, {}", id);
-            register_runtime_component!(&id);
-            let mut timer = interval(Duration::from_millis(200));
-            loop {
-                timer.tick().await;
-                if connection_state.is_finished() {
-                    // Set the flag
-                    let mut finished_flag = trace_write_lock!(finished_flag);
-                    debug!(
-                        "finished monitor task detects finished state and has set a finished flag"
-                    );
-                    *finished_flag = true;
-                    break;
-                }
-            }
-            info!("Timer for finished is finished");
-            deregister_runtime_component!(&id);
-        });
     }
 
     fn shutdown_writer_from_reader(
@@ -544,22 +497,18 @@ impl TcpTransport {
 
         tokio::spawn(async move {
             let id = format!("read-task, {}", id);
+            let mut status_code = StatusCode::Good;
             register_runtime_component!(&id);
             // The reader reads frames from the codec, which are messages
-            loop {
-                let next_msg = framed_read.next().await;
-                if next_msg.is_none() {
-                    continue;
-                }
-                match next_msg.unwrap() {
+            while let Some(next_msg) = framed_read.next().await {
+                match next_msg {
                     Ok(message) => {
-                        let mut session_status_code = StatusCode::Good;
                         match message {
                             Message::Acknowledge(ack) => {
                                 debug!("Reader got ack {:?}", ack);
                                 if read_state.state.state() != ConnectionState::WaitingForAck {
                                     error!("Reader got an unexpected ACK");
-                                    session_status_code = StatusCode::BadUnexpectedError;
+                                    status_code = StatusCode::BadUnexpectedError;
                                 } else {
                                     // TODO revise our sizes and other things according to the ACK
                                     read_state.state.set_state(ConnectionState::Processing);
@@ -568,7 +517,7 @@ impl TcpTransport {
                             Message::Chunk(chunk) => {
                                 if read_state.state.state() != ConnectionState::Processing {
                                     error!("Got an unexpected message chunk");
-                                    session_status_code = StatusCode::BadUnexpectedError;
+                                    status_code = StatusCode::BadUnexpectedError;
                                 } else {
                                     match read_state.process_chunk(chunk) {
                                         Ok(response) => {
@@ -579,47 +528,40 @@ impl TcpTransport {
                                                 message_queue.store_response(response).await;
                                             }
                                         }
-                                        Err(err) => session_status_code = err,
+                                        Err(err) => status_code = err,
                                     };
                                 }
                             }
                             Message::Error(error) => {
                                 // TODO client should go into an error recovery state, dropping the connection and reestablishing it.
-                                session_status_code =
-                                    if let Some(status_code) = StatusCode::from_u32(error.error) {
-                                        status_code
-                                    } else {
-                                        StatusCode::BadUnexpectedError
-                                    };
+                                status_code =
+                                    StatusCode::from_u32(error.error)
+                                        .unwrap_or(StatusCode::BadUnexpectedError);
                                 error!(
                                     "Expecting a chunk, got an error message {}",
-                                    session_status_code
+                                    status_code
                                 );
                             }
                             _ => {
                                 panic!("Expected a recognized message");
                             }
                         }
-                        if session_status_code.is_bad() {
-                            Self::shutdown_writer_from_reader(
-                                session_status_code,
-                                read_state.state.clone(),
-                                &writer_tx,
-                            );
+                        if status_code.is_bad() {
                             break;
                         }
                     }
                     Err(err) => {
                         error!("Read loop error {:?}", err);
-                        Self::shutdown_writer_from_reader(
-                            StatusCode::BadCommunicationError,
-                            read_state.state.clone(),
-                            &writer_tx,
-                        );
+                        status_code = StatusCode::BadCommunicationError;
                         break;
                     }
                 }
             }
+            Self::shutdown_writer_from_reader(
+                status_code,
+                read_state.state.clone(),
+                &writer_tx,
+            );
             debug!(
                 "Read loop finished, connection state = {:?}",
                 read_state.state.state()
@@ -637,67 +579,62 @@ impl TcpTransport {
         tokio::spawn(async move {
             let id = format!("write-task, {}", id);
             register_runtime_component!(&id);
-            loop {
-                match receiver.recv().await {
-                    Some(msg) => {
-                        match msg {
-                            message_queue::Message::Quit => {
-                                debug!("Writer {} received a quit", id);
-                                break;
-                            }
-                            message_queue::Message::SupportedMessage(request) => {
-                                if write_state.state.is_finished() {
-                                    debug!("Write loop is terminating due to finished state");
-                                    break;
-                                }
-                                let close_connection = {
-                                    if write_state.state.state() == ConnectionState::Processing {
-                                        trace!("Sending Request");
+            while let Some(msg) = receiver.recv().await {
+                match msg {
+                    message_queue::Message::Quit => {
+                        debug!("Writer {} received a quit", id);
+                        break;
+                    }
+                    message_queue::Message::SupportedMessage(request) => {
+                        if write_state.state.is_finished() {
+                            debug!("Write loop is terminating due to finished state");
+                            break;
+                        }
+                        let close_connection = {
+                            if write_state.state.state() == ConnectionState::Processing {
+                                trace!("Sending Request");
 
-                                        let close_connection =
-                                            if let SupportedMessage::CloseSecureChannelRequest(_) =
-                                                request
-                                            {
-                                                debug!("Writer is about to send a CloseSecureChannelRequest which means it should close in a moment");
-                                                true
-                                            } else {
-                                                false
-                                            };
-
-                                        // Write it to the outgoing buffer
-                                        let request_handle = request.request_handle();
-                                        let _ = write_state.send_request(request);
-                                        // Indicate the request was processed
-                                        {
-                                            let mut message_queue =
-                                                trace_write_lock!(write_state.message_queue);
-                                            message_queue.request_was_processed(request_handle);
-                                        }
-
-                                        if close_connection {
-                                            write_state.state.set_finished(StatusCode::Good);
-                                            debug!("Writer is setting the connection state to finished(good)");
-                                        }
-                                        close_connection
+                                let close_connection =
+                                    if let SupportedMessage::CloseSecureChannelRequest(_) =
+                                    request
+                                    {
+                                        debug!("Writer is about to send a CloseSecureChannelRequest which means it should close in a moment");
+                                        true
                                     } else {
-                                        // panic or not, perhaps there is a race
-                                        error!(
+                                        false
+                                    };
+
+                                // Write it to the outgoing buffer
+                                let request_handle = request.request_handle();
+                                let _ = write_state.send_request(request);
+                                // Indicate the request was processed
+                                {
+                                    let mut message_queue =
+                                        trace_write_lock!(write_state.message_queue);
+                                    message_queue.request_was_processed(request_handle);
+                                }
+
+                                if close_connection {
+                                    write_state.state.set_finished(StatusCode::Good);
+                                    debug!("Writer is setting the connection state to finished(good)");
+                                }
+                                close_connection
+                            } else {
+                                // panic or not, perhaps there is a race
+                                error!(
                                             "Writer, why is the connection state not processing?"
                                         );
-                                        write_state
-                                            .state
-                                            .set_finished(StatusCode::BadUnexpectedError);
-                                        true
-                                    }
-                                };
-
-                                write_state =
-                                    Self::write_bytes_task(write_state, close_connection).await;
+                                write_state
+                                    .state
+                                    .set_finished(StatusCode::BadUnexpectedError);
+                                true
                             }
                         };
+
+                        write_state =
+                            Self::write_bytes_task(write_state, close_connection).await;
                     }
-                    None => {}
-                }
+                };
             }
             debug!("Writer loop {} is finished", id);
             deregister_runtime_component!(&id);
@@ -727,10 +664,6 @@ impl TcpTransport {
 
         // At this stage, the HEL has been sent but the ACK has not been received
         connection_state.set_state(ConnectionState::WaitingForAck);
-
-        // Abort monitor
-        let finished_flag = Arc::new(RwLock::new(false));
-        Self::spawn_finished_monitor_task(connection_state.clone(), finished_flag.clone(), id);
 
         // Create the message receiver that will drive writes
         let (sender, receiver) = {
