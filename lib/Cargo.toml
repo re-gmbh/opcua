@@ -1,6 +1,6 @@
 [package]
 name = "opcua"
-version = "0.11.0" # OPCUARustVersion
+version = "0.12.0" # OPCUARustVersion
 description = "OPC UA client and server API"
 authors = ["Adam Lock <locka99@gmail.com>"]
 homepage = "https://github.com/locka99/opcua"
@@ -72,7 +72,7 @@ libc = "0.2"
 foreign-types = "0.3"
 
 [dependencies.env_logger]
-version = "0.5"
+version = "0.9"
 optional = true
 
 [dependencies.actix-web]
