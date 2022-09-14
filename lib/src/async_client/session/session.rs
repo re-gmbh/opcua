@@ -1545,7 +1545,7 @@ impl SessionService for Session {
                     "Revised session timeout is {}",
                     response.revised_session_timeout
                 );
-                self.spawn_session_activity_task(response.revised_session_timeout);
+                //self.spawn_session_activity_task(response.revised_session_timeout);
                 self.spawn_subscription_activity_task();
 
                 // TODO Verify signature using server's public key (from endpoint) comparing with data made from client certificate and nonce.
