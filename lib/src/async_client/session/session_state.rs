@@ -166,7 +166,7 @@ impl SessionState {
 
     const DEFAULT_REQUEST_TIMEOUT: u32 = 10 * 1000;
     const SEND_BUFFER_SIZE: usize = 65535;
-    const RECEIVE_BUFFER_SIZE: usize = 65535;
+    const RECEIVE_BUFFER_SIZE: usize = 65535 * 10;
     const MAX_BUFFER_SIZE: usize = 65535;
     const MAX_CHUNK_COUNT: usize = 0;
 
@@ -177,6 +177,7 @@ impl SessionState {
         message_queue: Arc<RwLock<MessageQueue>>,
     ) -> SessionState {
         let id = NEXT_SESSION_ID.fetch_add(1, Ordering::Relaxed);
+        let decoding_options = secure_channel.read().decoding_options();
         SessionState {
             id,
             client_offset: Duration::zero(),
@@ -184,10 +185,10 @@ impl SessionState {
             secure_channel,
             connection_state: ConnectionStateMgr::new(),
             request_timeout: Self::DEFAULT_REQUEST_TIMEOUT,
-            send_buffer_size: Self::SEND_BUFFER_SIZE,
-            receive_buffer_size: Self::RECEIVE_BUFFER_SIZE,
-            max_message_size: Self::MAX_BUFFER_SIZE,
-            max_chunk_count: Self::MAX_CHUNK_COUNT,
+            send_buffer_size: decoding_options.max_message_size,
+            receive_buffer_size: decoding_options.max_message_size,
+            max_message_size: decoding_options.max_message_size,
+            max_chunk_count: decoding_options.max_chunk_count,
             request_handle: Handle::new(Self::FIRST_REQUEST_HANDLE),
             session_id: NodeId::null(),
             authentication_token: NodeId::null(),

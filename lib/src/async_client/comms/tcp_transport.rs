@@ -14,6 +14,7 @@ use std::{
     sync::Arc,
     thread,
 };
+use std::task::Poll;
 
 use futures::StreamExt;
 use tokio::{
@@ -23,6 +24,7 @@ use tokio::{
     sync::mpsc::{UnboundedReceiver, UnboundedSender},
     time::{interval, sleep, Duration},
 };
+use tokio::io::AsyncWrite;
 use tokio_util::codec::FramedRead;
 
 use crate::core::{
@@ -498,7 +500,6 @@ impl TcpTransport {
         };
 
         let mut framed_read = FramedRead::new(reader, TcpCodec::new(decoding_options));
-
         tokio::spawn(async move {
             let id = format!("read-task, {}", id);
             let mut status_code = StatusCode::Good;
@@ -514,7 +515,12 @@ impl TcpTransport {
                                     error!("Reader got an unexpected ACK");
                                     status_code = StatusCode::BadUnexpectedError;
                                 } else {
-                                    // TODO revise our sizes and other things according to the ACK
+                                    // TODO check whether max message size and chunk count are enough to set here
+                                    let mut secure_channel = read_state.secure_channel.write();
+                                    let mut decoding_options = secure_channel.decoding_options();
+                                    decoding_options.max_message_size = ack.max_message_size as usize;
+                                    decoding_options.max_chunk_count = ack.max_chunk_count as usize;
+                                    secure_channel.set_decoding_options(decoding_options);
                                     read_state.state.set_state(ConnectionState::Processing);
                                 }
                             }
@@ -584,16 +590,16 @@ impl TcpTransport {
         tokio::spawn(async move {
             let id = format!("write-task, {}", id);
             register_runtime_component!(&id);
-            while let Some(msg) = receiver.recv().await {
+            'write_loop: while let Some(msg) = receiver.recv().await {
                 match msg {
                     message_queue::Message::Quit => {
                         debug!("Writer {} received a quit", id);
-                        break;
+                        break 'write_loop;
                     }
                     message_queue::Message::SupportedMessage(request) => {
                         if write_state.state.is_finished() {
                             debug!("Write loop is terminating due to finished state");
-                            break;
+                            break 'write_loop;
                         }
                         let close_connection = {
                             if write_state.state.state() == ConnectionState::Processing {
@@ -638,6 +644,8 @@ impl TcpTransport {
 
                         write_state =
                             Self::write_bytes_task(write_state, close_connection).await;
+
+                        if close_connection { break 'write_loop };
                     }
                 };
             }
