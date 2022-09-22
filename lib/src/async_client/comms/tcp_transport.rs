@@ -391,21 +391,25 @@ impl TcpTransport {
         connection_state.set_state(ConnectionState::Connecting);
 
         match TcpStream::connect(&addr).await {
-            io::Result::Err(err) => {
+            Err(err) => {
                 error!("Could not connect to host {}, {:?}", addr, err);
                 connection_state.set_finished(StatusCode::BadCommunicationError);
             }
-            io::Result::Ok(socket) => {
+            Ok(socket) => {
+                if let Err(err) = socket.set_nodelay(true) {
+                    connection_state.set_finished(StatusCode::BadUnexpectedError);
+                    return;
+                }
                 connection_state.set_state(ConnectionState::Connected);
                 let (reader, mut writer) = tokio::io::split(socket);
 
                 debug! {"Sending HELLO"};
                 match writer.write_all(&hello.encode_to_vec()).await {
-                    io::Result::Err(err) => {
+                    Err(err) => {
                         error!("Cannot send hello to server, err = {:?}", err);
                         connection_state.set_finished(StatusCode::BadCommunicationError);
                     }
-                    io::Result::Ok(_) => {
+                    Ok(_) => {
                         Self::spawn_looping_tasks(
                             reader,
                             writer,
@@ -445,10 +449,10 @@ impl TcpTransport {
         let bytes_to_write = write_state.send_buffer.bytes_to_write();
         let write_result = write_state.writer.write_all(&bytes_to_write).await;
         match write_result {
-            io::Result::Err(err) => {
+            Err(err) => {
                 error!("Write bytes task IO error {:?}", err);
             }
-            io::Result::Ok(_) => {
+            Ok(_) => {
                 trace!("Write bytes task finished");
                 // Connection might be closed now
                 if and_close_connection {
@@ -500,7 +504,7 @@ impl TcpTransport {
             let mut status_code = StatusCode::Good;
             register_runtime_component!(&id);
             // The reader reads frames from the codec, which are messages
-            while let Some(next_msg) = framed_read.next().await {
+            'read_loop: while let Some(next_msg) = framed_read.next().await {
                 match next_msg {
                     Ok(message) => {
                         match message {
@@ -541,19 +545,20 @@ impl TcpTransport {
                                     "Expecting a chunk, got an error message {}",
                                     status_code
                                 );
+                                break 'read_loop;
                             }
                             _ => {
                                 panic!("Expected a recognized message");
                             }
                         }
                         if status_code.is_bad() {
-                            break;
+                            break 'read_loop;
                         }
                     }
                     Err(err) => {
                         error!("Read loop error {:?}", err);
                         status_code = StatusCode::BadCommunicationError;
-                        break;
+                        break 'read_loop;
                     }
                 }
             }
