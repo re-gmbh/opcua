@@ -515,7 +515,7 @@ impl TcpTransport {
                                     error!("Reader got an unexpected ACK");
                                     status_code = StatusCode::BadUnexpectedError;
                                 } else {
-                                    // TODO check whether max message size and chunk count are enough to set here
+                                    // note that buffer sizes are ignored everywhere
                                     let mut secure_channel = read_state.secure_channel.write();
                                     let mut decoding_options = secure_channel.decoding_options();
                                     decoding_options.max_message_size = ack.max_message_size as usize;

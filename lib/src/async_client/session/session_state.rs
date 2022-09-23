@@ -166,9 +166,9 @@ impl SessionState {
 
     const DEFAULT_REQUEST_TIMEOUT: u32 = 10 * 1000;
     const SEND_BUFFER_SIZE: usize = 65535;
-    const RECEIVE_BUFFER_SIZE: usize = 65535 * 10;
+    const RECEIVE_BUFFER_SIZE: usize = 65535;
     const MAX_BUFFER_SIZE: usize = 65535;
-    const MAX_CHUNK_COUNT: usize = 0;
+    const MAX_CHUNK_COUNT: usize = 5000;
 
     pub fn new(
         ignore_clock_skew: bool,
@@ -178,6 +178,7 @@ impl SessionState {
     ) -> SessionState {
         let id = NEXT_SESSION_ID.fetch_add(1, Ordering::Relaxed);
         let decoding_options = secure_channel.read().decoding_options();
+        // note that the buffer sizes aren't used anywhere except in the Hello message 😅
         SessionState {
             id,
             client_offset: Duration::zero(),
@@ -185,8 +186,8 @@ impl SessionState {
             secure_channel,
             connection_state: ConnectionStateMgr::new(),
             request_timeout: Self::DEFAULT_REQUEST_TIMEOUT,
-            send_buffer_size: decoding_options.max_message_size,
-            receive_buffer_size: decoding_options.max_message_size,
+            send_buffer_size: Self::SEND_BUFFER_SIZE,
+            receive_buffer_size: Self::RECEIVE_BUFFER_SIZE,
             max_message_size: decoding_options.max_message_size,
             max_chunk_count: decoding_options.max_chunk_count,
             request_handle: Handle::new(Self::FIRST_REQUEST_HANDLE),

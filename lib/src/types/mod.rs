@@ -35,12 +35,12 @@ pub mod constants {
     /// Default maximum size of a message in bytes. 0 is any length, i.e. the other end can send a message of any size which is
     /// not recommended in a server configuration. Override in the client / server config.
     /// In clients, max message size is only preferred size since it can be adjusted by the server during the handshake.
-    pub const MAX_MESSAGE_SIZE: usize = 65535 * MAX_CHUNK_COUNT;
+    pub const MAX_MESSAGE_SIZE: usize = 1024*1024*16;
     /// Default maximum number of chunks in a single message. 0 is any number but this is not recommended
     /// as the default since server memory could be exhausted. Default number can be overridden
     /// by client / server config which is where it should happen if you want a different figure. In clients
     /// chunk size is a preferred value since the server can modify it during the handshake.
-    pub const MAX_CHUNK_COUNT: usize = 5;
+    pub const MAX_CHUNK_COUNT: usize = 5000;
     /// Default maximum decoding depth for recursive data structures, i.e. if data is nested deeper than this it is
     /// an error during decoding. This is a security measure to stop deeply nested junk being sent to
     /// a server / client.
