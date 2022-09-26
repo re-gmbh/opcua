@@ -164,7 +164,7 @@ impl SessionState {
     const FIRST_REQUEST_HANDLE: u32 = 1;
     const FIRST_MONITORED_ITEM_HANDLE: u32 = 1000;
 
-    const DEFAULT_REQUEST_TIMEOUT: u32 = 10 * 1000;
+    const DEFAULT_REQUEST_TIMEOUT: u32 = 15 * 1000;
     const SEND_BUFFER_SIZE: usize = 65535;
     const RECEIVE_BUFFER_SIZE: usize = 65535;
     const MAX_BUFFER_SIZE: usize = 65535;
@@ -446,7 +446,7 @@ impl SessionState {
     ) -> Result<(), StatusCode> {
         trace!("issue_or_renew_secure_channel({:?})", request_type);
 
-        const REQUESTED_LIFETIME: u32 = 60000; // TODO
+        const REQUESTED_LIFETIME: u32 = 3_600_000; // TODO
 
         let (security_mode, security_policy, client_nonce) = {
             let mut secure_channel = trace_write_lock!(self.secure_channel);
