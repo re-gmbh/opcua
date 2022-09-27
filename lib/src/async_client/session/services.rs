@@ -42,7 +42,7 @@ pub trait Service {
     /// Synchronously sends a request. The return value is the response to the request
     async fn send_request<T>(&self, request: T) -> Result<SupportedMessage, StatusCode>
     where
-        T: Into<SupportedMessage> + Send + std::fmt::Debug;
+        T: Into<SupportedMessage> + Clone + Send + std::fmt::Debug;
 
     /// Asynchronously sends a request. The return value is the request handle of the request
     fn async_send_request<T>(
@@ -51,7 +51,7 @@ pub trait Service {
         sender: Option<Sender<SupportedMessage>>,
     ) -> Result<u32, StatusCode>
     where
-        T: Into<SupportedMessage> + std::fmt::Debug;
+        T: Into<SupportedMessage> + Clone + Send + std::fmt::Debug;
 }
 
 /// Discovery Service set

@@ -14,17 +14,14 @@ use std::{
     sync::Arc,
     thread,
 };
-use std::task::Poll;
 
 use futures::StreamExt;
 use tokio::{
-    self,
     io::{self, AsyncWriteExt, ReadHalf, WriteHalf},
     net::TcpStream,
     sync::mpsc::{UnboundedReceiver, UnboundedSender},
     time::{interval, sleep, Duration},
 };
-use tokio::io::AsyncWrite;
 use tokio_util::codec::FramedRead;
 
 use crate::core::{
@@ -43,7 +40,6 @@ use crate::types::status_code::StatusCode;
 use crate::{deregister_runtime_component, register_runtime_component};
 
 use crate::async_client::{
-    callbacks::OnSessionClosed,
     comms::transport::Transport,
     message_queue::{self, MessageQueue},
     session::session_state::{ConnectionState, ConnectionStateMgr, SessionState},
@@ -398,7 +394,7 @@ impl TcpTransport {
                 connection_state.set_finished(StatusCode::BadCommunicationError);
             }
             Ok(socket) => {
-                if let Err(err) = socket.set_nodelay(true) {
+                if let Err(_) = socket.set_nodelay(true) {
                     connection_state.set_finished(StatusCode::BadUnexpectedError);
                     return;
                 }

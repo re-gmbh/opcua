@@ -233,7 +233,7 @@ impl SecureChannel {
             let renew_lifetime = (self.token_lifetime() * 3) / 4;
             let renew_lifetime = Duration::milliseconds(renew_lifetime as i64);
             // Renew the token?
-            DateTime::now() - self.token_created_at() > renew_lifetime
+            (self.token_created_at() + renew_lifetime) < DateTime::now()
         }
     }
 

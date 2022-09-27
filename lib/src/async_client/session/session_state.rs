@@ -365,13 +365,16 @@ impl SessionState {
     where
         T: Into<SupportedMessage> + std::fmt::Debug,
     {
+
         let request = request.into();
         match request {
             SupportedMessage::OpenSecureChannelRequest(_)
             | SupportedMessage::CloseSecureChannelRequest(_) => {}
             _ => {
                 // Make sure secure channel token hasn't expired
-                let _ = self.ensure_secure_channel_token();
+                if self.should_renew_security_token() {
+                    return Err(StatusCode::BadSecureChannelTokenUnknown)
+                }
             }
         }
 
@@ -427,17 +430,9 @@ impl SessionState {
     }
 
     /// Checks if secure channel token needs to be renewed and renews it
-    async fn ensure_secure_channel_token(&mut self) -> Result<(), StatusCode> {
-        let should_renew_security_token = {
-            let secure_channel = trace_read_lock!(self.secure_channel);
-            secure_channel.should_renew_security_token()
-        };
-        if should_renew_security_token {
-            self.issue_or_renew_secure_channel(SecurityTokenRequestType::Renew)
-                .await
-        } else {
-            Ok(())
-        }
+    fn should_renew_security_token(&mut self) -> bool {
+        let secure_channel = trace_read_lock!(self.secure_channel);
+        secure_channel.should_renew_security_token()
     }
 
     pub(crate) async fn issue_or_renew_secure_channel(
@@ -446,7 +441,7 @@ impl SessionState {
     ) -> Result<(), StatusCode> {
         trace!("issue_or_renew_secure_channel({:?})", request_type);
 
-        const REQUESTED_LIFETIME: u32 = 3_600_000; // TODO
+        const REQUESTED_LIFETIME: u32 = 3_600_000; // TODO: make configurable
 
         let (security_mode, security_policy, client_nonce) = {
             let mut secure_channel = trace_write_lock!(self.secure_channel);
@@ -458,6 +453,8 @@ impl SessionState {
                 client_nonce,
             )
         };
+
+        // TOOD: send close secure channel request when renewing existing channel
 
         info!("Making secure channel request");
         info!("security_mode = {:?}", security_mode);

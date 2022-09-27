@@ -740,83 +740,6 @@ impl Session {
         Ok(did_something)
     }
 
-    /// Start a task that will periodically "ping" the server to keep the session alive. The ping rate
-    /// will be 3/4 the session timeout rate.
-    ///
-    /// NOTE: This code assumes that the session_timeout period never changes, e.g. if you
-    /// connected to a server, negotiate a timeout period and then for whatever reason need to
-    /// reconnect to that same server, you will receive the same timeout. If you get a different
-    /// timeout then this code will not care and will continue to ping at the original rate.
-    fn spawn_session_activity_task(&self, session_timeout: f64) {
-        session_debug!(self, "spawn_session_activity_task({})", session_timeout);
-
-        let connection_state = {
-            let session_state = trace_read_lock!(self.session_state);
-            session_state.connection_state()
-        };
-
-        let session_state = self.session_state.clone();
-
-        // Session activity will happen every 3/4 of the timeout period
-        const MIN_SESSION_ACTIVITY_MS: u64 = 1000;
-        let session_activity = cmp::max((session_timeout as u64 / 4) * 3, MIN_SESSION_ACTIVITY_MS);
-        session_debug!(
-            self,
-            "session timeout is {}, activity timer is {}",
-            session_timeout,
-            session_activity
-        );
-
-        let id = format!("session-activity-thread-{:?}", thread::current().id());
-        tokio::spawn(async move {
-            register_runtime_component!(&id);
-            // The timer runs at a higher frequency timer loop to terminate as soon after the session
-            // state has terminated. Each time it runs it will test if the interval has elapsed or not.
-            let session_activity_interval = Duration::from_millis(session_activity);
-            let mut timer = interval(Duration::from_millis(MIN_SESSION_ACTIVITY_MS));
-            let mut last_timeout = Instant::now();
-
-            loop {
-                timer.tick().await;
-
-                if connection_state.is_finished() {
-                    info!("Session activity timer is terminating");
-                    break;
-                }
-
-                // Get the time now
-                let now = Instant::now();
-
-                // Calculate to interval since last check
-                let interval = now - last_timeout;
-                if interval > session_activity_interval {
-                    match connection_state.state() {
-                        ConnectionState::Processing => {
-                            info!("Session activity keep-alive request");
-                            let mut session_state = trace_write_lock!(session_state);
-                            let request_header = session_state.make_request_header();
-                            let request = ReadRequest {
-                                request_header,
-                                max_age: 1f64,
-                                timestamps_to_return: TimestampsToReturn::Server,
-                                nodes_to_read: Some(vec![]),
-                            };
-                            // The response to this is ignored
-                            let _ = session_state.async_send_request(request, None);
-                        }
-                        connection_state => {
-                            info!("Session activity keep-alive is doing nothing - connection state = {:?}", connection_state);
-                        }
-                    };
-                    last_timeout = now;
-                }
-            }
-
-            info!("Session activity timer task is finished");
-            deregister_runtime_component!(&id);
-        });
-    }
-
     /// Start a task that will periodically send a publish request to keep the subscriptions alive.
     /// The request rate will be 3/4 of the shortest (revised publishing interval * the revised keep
     /// alive count) of all subscriptions that belong to a single session.
@@ -1310,6 +1233,14 @@ impl Session {
             _ => ByteString::null()
         }
     }
+
+    async fn do_send_request<T>(&self, request: T) -> Result<SupportedMessage, StatusCode>
+        where
+            T: Into<SupportedMessage> + Send + std::fmt::Debug,
+    {
+        let mut session_state = trace_write_lock!(self.session_state);
+        session_state.send_request(request).await
+    }
 }
 
 #[async_trait]
@@ -1324,10 +1255,28 @@ impl Service for Session {
     /// Synchronously sends a request. The return value is the response to the request
     async fn send_request<T>(&self, request: T) -> Result<SupportedMessage, StatusCode>
     where
-        T: Into<SupportedMessage> + Send + std::fmt::Debug,
+        T: Into<SupportedMessage> + Clone + Send + std::fmt::Debug,
     {
-        let mut session_state = trace_write_lock!(self.session_state);
-        session_state.send_request(request).await
+        let first_try = request.clone();
+        match self.do_send_request(first_try).await {
+            Err(StatusCode::BadSecureChannelTokenUnknown) => {
+                let renewal_type = {
+                    let secure_channel = trace_read_lock!(self.secure_channel);
+                    if secure_channel.token_id() == 0 {
+                        SecurityTokenRequestType::Issue
+                    } else {
+                        SecurityTokenRequestType::Renew
+                    }
+                };
+                {
+                    let mut session_state = trace_write_lock!(self.session_state);
+                    session_state.issue_or_renew_secure_channel(renewal_type).await?;
+                }
+                self.activate_session().await?;
+                self.do_send_request(request).await
+            },
+           foo => foo
+        }
     }
 
     // Asynchronously sends a request. The return value is the request handle of the request
@@ -1337,7 +1286,7 @@ impl Service for Session {
         sender: Option<Sender<SupportedMessage>>,
     ) -> Result<u32, StatusCode>
     where
-        T: Into<SupportedMessage> + std::fmt::Debug,
+        T: Into<SupportedMessage> + Clone + Send + std::fmt::Debug,
     {
         let mut session_state = trace_write_lock!(self.session_state);
         session_state.async_send_request(request, sender)
@@ -1545,7 +1494,6 @@ impl SessionService for Session {
                     "Revised session timeout is {}",
                     response.revised_session_timeout
                 );
-                //self.spawn_session_activity_task(response.revised_session_timeout);
                 self.spawn_subscription_activity_task();
 
                 // TODO Verify signature using server's public key (from endpoint) comparing with data made from client certificate and nonce.
