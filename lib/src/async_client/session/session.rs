@@ -140,9 +140,11 @@ pub struct Session {
 }
 
 impl Drop for Session {
+    // FIXME: requires async functionality - improve this pattern
     fn drop(&mut self) {
         info!("Session has dropped");
-        self.disconnect();
+        let runtime = tokio::runtime::Handle::current();
+        runtime.block_on(self.disconnect());
     }
 }
 
@@ -556,11 +558,17 @@ impl Session {
     /// Disconnect from the server. Disconnect is an explicit command to drop the socket and throw
     /// away all state information. If you disconnect you cannot reconnect to your existing session
     /// or retrieve any existing subscriptions.
-    pub fn disconnect(&self) {
+    pub async fn disconnect(&self) {
         if self.is_connected() {
-            let _ = self.close_session_and_delete_subscriptions();
-            let _ = self.close_secure_channel();
+            let has_session = {
+                let session_state = trace_read_lock!(self.session_state);
+                !session_state.session_id().is_null()
+            };
+            if has_session {
+                let _ = self.close_session_and_delete_subscriptions().await;
+            }
 
+            let _ = self.close_secure_channel();
             {
                 let mut session_state = trace_write_lock!(self.session_state);
                 session_state.quit();
@@ -726,7 +734,7 @@ impl Session {
                             session_retry_policy.retry_count()
                         );
                         drop(session_retry_policy);
-                        self.disconnect();
+                        self.disconnect().await;
                     }
                     true
                 }

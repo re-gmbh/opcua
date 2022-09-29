@@ -373,6 +373,7 @@ impl SessionState {
             _ => {
                 // Make sure secure channel token hasn't expired
                 if self.should_renew_security_token() {
+                    log::info!("Cannot send message, must renew secure channel first");
                     return Err(StatusCode::BadSecureChannelTokenUnknown)
                 }
             }
@@ -456,7 +457,7 @@ impl SessionState {
 
         // TOOD: send close secure channel request when renewing existing channel
 
-        info!("Making secure channel request");
+        info!("Making secure channel request ({:?})", request_type);
         info!("security_mode = {:?}", security_mode);
         info!("security_policy = {:?}", security_policy);
 
