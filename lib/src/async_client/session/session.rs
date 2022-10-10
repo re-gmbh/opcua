@@ -1277,10 +1277,14 @@ impl Service for Session {
                     }
                 };
                 {
+                    // TODO: find out whether channel id can change & ActivateSession is necessary at all
+                    let old_secure_channel_id = self.secure_channel.read().secure_channel_id();
                     let mut session_state = trace_write_lock!(self.session_state);
                     session_state.issue_or_renew_secure_channel(renewal_type).await?;
+                    if self.secure_channel.read().secure_channel_id() != old_secure_channel_id {
+                        self.activate_session().await?;
+                    }
                 }
-                self.activate_session().await?;
                 self.do_send_request(request).await
             },
            foo => foo
