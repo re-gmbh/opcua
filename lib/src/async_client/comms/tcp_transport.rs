@@ -22,6 +22,7 @@ use tokio::{
     sync::mpsc::{UnboundedReceiver, UnboundedSender},
     time::{interval, sleep, Duration},
 };
+use tokio::time::timeout;
 use tokio_util::codec::FramedRead;
 
 use crate::core::{
@@ -388,46 +389,61 @@ impl TcpTransport {
 
         connection_state.set_state(ConnectionState::Connecting);
 
-        match TcpStream::connect(&addr).await {
+        let connect_timeout = {
+            let session_state = trace_read_lock!(session_state);
+            session_state.request_timeout()
+        };
+
+        match timeout(Duration::from_millis(connect_timeout as u64),
+                      TcpStream::connect(&addr)).await {
             Err(err) => {
-                error!("Could not connect to host {}, {:?}", addr, err);
+                error!("Timeout while trying to connect to host {}, {:?}", addr, err);
                 connection_state.set_finished(StatusCode::BadCommunicationError);
             }
-            Ok(socket) => {
-                if let Err(_) = socket.set_nodelay(true) {
-                    connection_state.set_finished(StatusCode::BadUnexpectedError);
-                    return;
-                }
-                connection_state.set_state(ConnectionState::Connected);
-                let (reader, mut writer) = tokio::io::split(socket);
-
-                debug! {"Sending HELLO"};
-                match writer.write_all(&hello.encode_to_vec()).await {
+            Ok(connect_result) => {
+                match connect_result {
                     Err(err) => {
-                        error!("Cannot send hello to server, err = {:?}", err);
+                        error!("Failed to connect to host {}, {:?}", addr, err);
                         connection_state.set_finished(StatusCode::BadCommunicationError);
                     }
-                    Ok(_) => {
-                        Self::spawn_looping_tasks(
-                            reader,
-                            writer,
-                            connection_state.clone(),
-                            session_state.clone(),
-                            secure_channel,
-                            message_queue,
-                        );
-                    }
-                };
-                // Wait for connection state to be closed
-                let mut timer = interval(Duration::from_millis(10));
-                loop {
-                    timer.tick().await;
-                    {
-                        if connection_state.is_finished() {
-                            debug!(
+                    Ok(socket) => {
+                        if let Err(_) = socket.set_nodelay(true) {
+                            connection_state.set_finished(StatusCode::BadUnexpectedError);
+                            return;
+                        }
+                        connection_state.set_state(ConnectionState::Connected);
+                        let (reader, mut writer) = tokio::io::split(socket);
+
+                        debug! {"Sending HELLO"}
+                        ;
+                        match writer.write_all(&hello.encode_to_vec()).await {
+                            Err(err) => {
+                                error!("Cannot send hello to server, err = {:?}", err);
+                                connection_state.set_finished(StatusCode::BadCommunicationError);
+                            }
+                            Ok(_) => {
+                                Self::spawn_looping_tasks(
+                                    reader,
+                                    writer,
+                                    connection_state.clone(),
+                                    session_state.clone(),
+                                    secure_channel,
+                                    message_queue,
+                                );
+                            }
+                        };
+                        // Wait for connection state to be closed
+                        let mut timer = interval(Duration::from_millis(10));
+                        loop {
+                            timer.tick().await;
+                            {
+                                if connection_state.is_finished() {
+                                    debug!(
                                 "Connection state is finished so dropping out of connection task"
                             );
-                            break;
+                                    break;
+                                }
+                            }
                         }
                     }
                 }
