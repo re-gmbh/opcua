@@ -394,7 +394,7 @@ impl TcpTransport {
             session_state.request_timeout()
         };
 
-        match timeout(Duration::from_millis(connect_timeout as u64),
+        match timeout(connect_timeout,
                       TcpStream::connect(&addr)).await {
             Err(err) => {
                 error!("Timeout while trying to connect to host {}, {:?}", addr, err);
