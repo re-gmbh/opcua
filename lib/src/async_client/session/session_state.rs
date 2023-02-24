@@ -167,8 +167,6 @@ impl SessionState {
     const DEFAULT_REQUEST_TIMEOUT: u32 = 15 * 1000;
     const SEND_BUFFER_SIZE: usize = 65535;
     const RECEIVE_BUFFER_SIZE: usize = 65535;
-    const MAX_BUFFER_SIZE: usize = 65535;
-    const MAX_CHUNK_COUNT: usize = 5000;
 
     pub fn new(
         ignore_clock_skew: bool,

@@ -7,7 +7,7 @@
 //!
 //! The session also has async functionality but that is reserved for publish requests on subscriptions
 //! and events.
-use std::{cmp, collections::HashSet, result::Result, str::FromStr, sync::Arc, thread};
+use std::{collections::HashSet, result::Result, str::FromStr, sync::Arc, thread};
 
 use async_trait::async_trait;
 use tokio::{
@@ -38,7 +38,7 @@ use crate::async_client::{
     message_queue::MessageQueue,
     process_service_result, process_unexpected_response,
     session::services::*,
-    session::session_state::{ConnectionState, SessionState},
+    session::session_state::SessionState,
     session_retry_policy::{Answer, SessionRetryPolicy},
     subscription::{self, Subscription},
     subscription_state::SubscriptionState,
@@ -140,11 +140,11 @@ pub struct Session {
 }
 
 impl Drop for Session {
-    // FIXME: requires async functionality - improve this pattern
     fn drop(&mut self) {
         info!("Session has dropped");
-        let runtime = tokio::runtime::Handle::current();
-        runtime.block_on(self.disconnect());
+        if self.is_connected() && self.has_session() {
+            panic!("Please disconnect the session before dropping");
+        }
     }
 }
 
@@ -565,11 +565,7 @@ impl Session {
     /// or retrieve any existing subscriptions.
     pub async fn disconnect(&self) {
         if self.is_connected() {
-            let has_session = {
-                let session_state = trace_read_lock!(self.session_state);
-                !session_state.session_id().is_null()
-            };
-            if has_session {
+            if self.has_session() {
                 let _ = self.close_session_and_delete_subscriptions().await;
             }
 
@@ -582,6 +578,11 @@ impl Session {
             self.transport.wait_for_disconnect();
             self.on_connection_status_change(false);
         }
+    }
+
+    fn has_session(&self) -> bool {
+        let session_state = trace_read_lock!(self.session_state);
+        !session_state.session_id().is_null()
     }
 
     /// Test if the session is in a connected state

@@ -493,7 +493,7 @@ impl Client {
             );
             session.connect().await?;
             let result = session.get_endpoints().await?;
-            session.disconnect();
+            session.disconnect().await;
             Ok(result)
         }
     }
@@ -530,7 +530,7 @@ impl Client {
                         );
                         err
                     });
-                session.disconnect();
+                session.disconnect().await;
                 result
             } else {
                 let result = connected.unwrap_err();
@@ -604,7 +604,7 @@ impl Client {
                             Ok(_) => {
                                 // Register with the server
                                 let result = session.register_server(server).await;
-                                session.disconnect();
+                                session.disconnect().await;
                                 result
                             }
                             Err(result) => {
