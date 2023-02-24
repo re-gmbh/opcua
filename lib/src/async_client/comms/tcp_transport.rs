@@ -17,7 +17,7 @@ use std::{
 
 use futures::StreamExt;
 use tokio::{
-    io::{self, AsyncWriteExt, ReadHalf, WriteHalf},
+    io::{AsyncWriteExt, ReadHalf, WriteHalf},
     net::TcpStream,
     sync::mpsc::{UnboundedReceiver, UnboundedSender},
     time::{interval, sleep, Duration},
