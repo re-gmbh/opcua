@@ -87,6 +87,7 @@ impl ConnectionStateMgr {
         !matches!(
             self.state(),
             ConnectionState::NotStarted
+                | ConnectionState::WaitingForAck
                 | ConnectionState::Connecting
                 | ConnectionState::Finished(_)
         )

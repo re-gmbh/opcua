@@ -20,7 +20,7 @@ use tokio::{
     io::{AsyncWriteExt, ReadHalf, WriteHalf},
     net::TcpStream,
     sync::mpsc::{UnboundedReceiver, UnboundedSender},
-    time::{interval, sleep, Duration},
+    time::{sleep, Duration},
 };
 use tokio::time::timeout;
 use tokio_util::codec::FramedRead;
@@ -304,9 +304,7 @@ impl TcpTransport {
             );
             let endpoint_url = endpoint_url.to_string();
 
-            let id = format!("client-connection-thread-{:?}", thread::current().id());
             Self::connection_task(
-                id,
                 addr,
                 connection_state,
                 endpoint_url,
@@ -361,7 +359,6 @@ impl TcpTransport {
 
     /// This is the main connection task for a connection.
     async fn connection_task(
-        id: String,
         addr: SocketAddr,
         connection_state: ConnectionStateMgr,
         endpoint_url: String,
@@ -369,8 +366,6 @@ impl TcpTransport {
         secure_channel: Arc<RwLock<SecureChannel>>,
         message_queue: Arc<RwLock<MessageQueue>>,
     ) {
-        register_runtime_component!(&id);
-
         debug!(
             "Creating a connection task to connect to {} with url {}",
             addr, endpoint_url
@@ -432,28 +427,10 @@ impl TcpTransport {
                                 );
                             }
                         };
-                        // Wait for connection state to be closed
-                        let mut timer = interval(Duration::from_millis(10));
-                        loop {
-                            timer.tick().await;
-                            {
-                                if connection_state.is_finished() {
-                                    debug!(
-                                "Connection state is finished so dropping out of connection task"
-                            );
-                                    break;
-                                }
-                            }
-                        }
                     }
                 }
             }
         }
-        // there used to be some code here which invoked the on_session_closed callback of the
-        // session state. Since it should be possible to re-establish the connection and transfer
-        // the session into it, closing the TCP transport must not be directly associated with
-        // closing the session.
-        deregister_runtime_component!(&id);
     }
 
     async fn write_bytes_task(
@@ -514,7 +491,7 @@ impl TcpTransport {
         let mut framed_read = FramedRead::new(reader, TcpCodec::new(decoding_options));
         tokio::spawn(async move {
             let id = format!("read-task, {}", id);
-            let mut status_code = StatusCode::Good;
+            let mut status_code = None;
             register_runtime_component!(&id);
             // The reader reads frames from the codec, which are messages
             'read_loop: while let Some(next_msg) = framed_read.next().await {
@@ -525,7 +502,7 @@ impl TcpTransport {
                                 debug!("Reader got ack {:?}", ack);
                                 if read_state.state.state() != ConnectionState::WaitingForAck {
                                     error!("Reader got an unexpected ACK");
-                                    status_code = StatusCode::BadUnexpectedError;
+                                    status_code = Some(StatusCode::BadUnexpectedError);
                                 } else {
                                     // note that buffer sizes are ignored everywhere
                                     let mut secure_channel = read_state.secure_channel.write();
@@ -539,7 +516,7 @@ impl TcpTransport {
                             Message::Chunk(chunk) => {
                                 if read_state.state.state() != ConnectionState::Processing {
                                     error!("Got an unexpected message chunk");
-                                    status_code = StatusCode::BadUnexpectedError;
+                                    status_code = Some(StatusCode::BadUnexpectedError);
                                 } else {
                                     match read_state.process_chunk(chunk) {
                                         Ok(response) => {
@@ -550,18 +527,18 @@ impl TcpTransport {
                                                 message_queue.store_response(response).await;
                                             }
                                         }
-                                        Err(err) => status_code = err,
+                                        Err(err) => status_code = Some(err),
                                     };
                                 }
                             }
                             Message::Error(error) => {
                                 // TODO client should go into an error recovery state, dropping the connection and reestablishing it.
                                 status_code =
-                                    StatusCode::from_u32(error.error)
-                                        .unwrap_or(StatusCode::BadUnexpectedError);
+                                    Some(StatusCode::from_u32(error.error)
+                                        .unwrap_or(StatusCode::BadUnexpectedError));
                                 error!(
                                     "Expecting a chunk, got an error message {}",
-                                    status_code
+                                    status_code.as_ref().unwrap()
                                 );
                                 break 'read_loop;
                             }
@@ -569,19 +546,23 @@ impl TcpTransport {
                                 panic!("Expected a recognized message");
                             }
                         }
-                        if status_code.is_bad() {
+                        // Option::is_some_and is still unstable 😿
+                        if status_code.map_or(false, |sc| sc.is_bad()) {
                             break 'read_loop;
                         }
                     }
                     Err(err) => {
                         error!("Read loop error {:?}", err);
-                        status_code = StatusCode::BadCommunicationError;
+                        status_code = Some(StatusCode::BadCommunicationError);
                         break 'read_loop;
                     }
                 }
             }
+            if status_code.is_none() {
+                error!("framed_read closed, unexpected end of connection");
+            }
             Self::shutdown_writer_from_reader(
-                status_code,
+                status_code.unwrap_or(StatusCode::BadCommunicationError),
                 read_state.state.clone(),
                 &writer_tx,
             );
