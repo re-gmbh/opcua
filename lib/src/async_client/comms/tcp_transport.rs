@@ -388,6 +388,7 @@ impl TcpTransport {
 
         connection_state.set_state(ConnectionState::Connecting);
 
+        // TODO: use request timeout for new connections, too
         match TcpStream::connect(&addr).await {
             Err(err) => {
                 error!("Could not connect to host {}, {:?}", addr, err);

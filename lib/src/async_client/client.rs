@@ -397,6 +397,7 @@ impl Client {
                 self.session_retry_policy.clone(),
                 self.decoding_options(),
                 self.config.performance.ignore_clock_skew,
+                self.config.request_timeout,
             )));
             Ok(session)
         }
@@ -488,6 +489,7 @@ impl Client {
                 self.session_retry_policy.clone(),
                 self.decoding_options(),
                 self.config.performance.ignore_clock_skew,
+                self.config.request_timeout,
             );
             session.connect().await?;
             let result = session.get_endpoints().await?;

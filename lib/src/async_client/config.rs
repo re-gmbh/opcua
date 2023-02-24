@@ -10,6 +10,7 @@ use std::{
     path::{Path, PathBuf},
     str::FromStr,
 };
+use std::time::Duration;
 
 use crate::core::config::Config;
 use crate::crypto::SecurityPolicy;
@@ -201,6 +202,8 @@ pub struct ClientConfig {
     pub performance: Performance,
     /// Session name
     pub session_name: String,
+    /// Request timeout. Will use defaults if not specified.
+    pub request_timeout: Option<Duration>,
 }
 
 impl Config for ClientConfig {
@@ -338,6 +341,7 @@ impl ClientConfig {
                 ignore_clock_skew: false,
             },
             session_name: "Rust OPC UA Client".into(),
+            request_timeout: None,
         }
     }
 }

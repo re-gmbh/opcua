@@ -170,6 +170,7 @@ impl Session {
         session_retry_policy: SessionRetryPolicy,
         decoding_options: DecodingOptions,
         ignore_clock_skew: bool,
+        request_timeout: Option<Duration>,
     ) -> Session
     where
         T: Into<UAString>,
@@ -191,6 +192,7 @@ impl Session {
             secure_channel.clone(),
             subscription_state.clone(),
             message_queue.clone(),
+            request_timeout,
         )));
 
         let transport = TcpTransport::new(
@@ -221,12 +223,15 @@ impl Session {
             secure_channel.clear_security_token();
         }
 
+        let request_timeout = self.session_state.read().request_timeout();
+
         // Create a new session state
         self.session_state = Arc::new(RwLock::new(SessionState::new(
             self.ignore_clock_skew,
             self.secure_channel.clone(),
             self.subscription_state.clone(),
             self.message_queue.clone(),
+            Some(request_timeout),
         )));
 
         // Create a new transport
