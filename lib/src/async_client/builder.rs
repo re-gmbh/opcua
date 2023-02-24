@@ -3,6 +3,7 @@
 // Copyright (C) 2017-2022 Adam Lock
 
 use std::path::PathBuf;
+use std::time::Duration;
 
 use crate::async_client::{client::Client, config::*};
 use crate::core::config::Config;
@@ -245,6 +246,11 @@ impl ClientBuilder {
         self
     }
 
+    pub fn request_timeout(mut self, request_timeout: Duration) -> Self {
+        self.config.request_timeout = Some(request_timeout);
+        self
+    }
+
     /// Sets whether the client should ignore clock skew so the client can make a successful
     /// connection to the server, even when the client and server clocks are out of sync.
     pub fn ignore_clock_skew(mut self) -> Self {
@@ -284,6 +290,7 @@ fn client_builder() {
         .session_timeout(777)
         .ignore_clock_skew()
         .session_name("SessionName")
+        .request_timeout(Duration::from_millis(2000))
         // TODO user tokens, endpoints
         ;
 
@@ -308,4 +315,5 @@ fn client_builder() {
     assert_eq!(c.session_timeout, 777);
     assert_eq!(c.performance.ignore_clock_skew, true);
     assert_eq!(c.session_name, "SessionName");
+    assert_eq!(c.request_timeout, Some(Duration::from_millis(2000)))
 }

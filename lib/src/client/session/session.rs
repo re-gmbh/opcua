@@ -40,7 +40,6 @@ use crate::{
     core::{
         comms::{
             secure_channel::{Role, SecureChannel},
-            url::*,
         },
         supported_message::SupportedMessage,
         RUNTIME,
@@ -1389,8 +1388,6 @@ impl SessionService for Session {
 
             // session_debug!(self, "Server nonce is {:?}", response.server_nonce);
 
-            // The server certificate is validated if the policy requires it
-            let security_policy = self.security_policy();
             // FIXME: certificate verification is really problematic in NAT situations
             // right now, verification is patched out
             let cert_status_code = StatusCode::Good;

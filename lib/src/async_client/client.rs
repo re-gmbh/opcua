@@ -397,6 +397,7 @@ impl Client {
                 self.session_retry_policy.clone(),
                 self.decoding_options(),
                 self.config.performance.ignore_clock_skew,
+                self.config.request_timeout,
             )));
             Ok(session)
         }
@@ -488,10 +489,11 @@ impl Client {
                 self.session_retry_policy.clone(),
                 self.decoding_options(),
                 self.config.performance.ignore_clock_skew,
+                self.config.request_timeout,
             );
             session.connect().await?;
             let result = session.get_endpoints().await?;
-            session.disconnect();
+            session.disconnect().await;
             Ok(result)
         }
     }
@@ -528,7 +530,7 @@ impl Client {
                         );
                         err
                     });
-                session.disconnect();
+                session.disconnect().await;
                 result
             } else {
                 let result = connected.unwrap_err();
@@ -602,7 +604,7 @@ impl Client {
                             Ok(_) => {
                                 // Register with the server
                                 let result = session.register_server(server).await;
-                                session.disconnect();
+                                session.disconnect().await;
                                 result
                             }
                             Err(result) => {

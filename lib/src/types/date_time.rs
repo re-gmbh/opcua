@@ -139,12 +139,10 @@ impl From<(u16, u16, u16, u16, u16, u16, u32)> for DateTime {
         if nanos as i64 >= NANOS_PER_SECOND {
             panic!("Invalid nanosecond");
         }
-        let dt = Utc.ymd(year as i32, month as u32, day as u32).and_hms_nano(
-            hour as u32,
-            minute as u32,
-            second as u32,
-            nanos,
-        );
+        let dt = Utc.with_ymd_and_hms(year as i32, month as u32, day as u32, hour as u32, minute as u32, second as u32)
+            .unwrap() // input was checked individually, would have panicked already
+            .with_nanosecond(nanos)
+            .unwrap();
         DateTime::from(dt)
     }
 }
@@ -159,9 +157,7 @@ impl From<DateTimeUtc> for DateTime {
         let minute = date_time.minute();
         let second = date_time.second();
         let nanos = (date_time.nanosecond() / NANOS_PER_TICK as u32) * NANOS_PER_TICK as u32;
-        let date_time = Utc
-            .ymd(year, month, day)
-            .and_hms_nano(hour, minute, second, nanos);
+        let date_time = Utc.with_ymd_and_hms(year, month, day, hour, minute, second).unwrap().with_nanosecond(nanos).unwrap();
         DateTime { date_time }
     }
 }
@@ -300,13 +296,14 @@ impl DateTime {
 
     /// The OPC UA epoch - Jan 1 1601 00:00:00
     fn epoch_chrono() -> DateTimeUtc {
-        Utc.ymd(MIN_YEAR as i32, 1, 1).and_hms(0, 0, 0)
+        Utc.with_ymd_and_hms(MIN_YEAR as i32, 1, 1, 0, 0, 0).unwrap()
     }
 
     /// The OPC UA endtimes - Dec 31 9999 23:59:59 i.e. the date after which dates are returned as MAX_INT64 ticks
     /// Spec doesn't say what happens in the last second before midnight...
     fn endtimes_chrono() -> DateTimeUtc {
-        Utc.ymd(MAX_YEAR as i32, 12, 31).and_hms(23, 59, 59)
+        Utc.with_ymd_and_hms(MAX_YEAR as i32, 12, 31, 23, 59, 59)
+            .unwrap()
     }
 
     /// Turns a duration to ticks

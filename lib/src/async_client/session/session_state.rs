@@ -116,7 +116,7 @@ pub(crate) struct SessionState {
     connection_state: ConnectionStateMgr,
     /// The request timeout is how long the session will wait from sending a request expecting a response
     /// if no response is received the client will terminate.
-    request_timeout: u32,
+    request_timeout: std::time::Duration,
     /// Size of the send buffer
     send_buffer_size: usize,
     /// Size of the
@@ -167,14 +167,13 @@ impl SessionState {
     const DEFAULT_REQUEST_TIMEOUT: u32 = 15 * 1000;
     const SEND_BUFFER_SIZE: usize = 65535;
     const RECEIVE_BUFFER_SIZE: usize = 65535;
-    const MAX_BUFFER_SIZE: usize = 65535;
-    const MAX_CHUNK_COUNT: usize = 5000;
 
     pub fn new(
         ignore_clock_skew: bool,
         secure_channel: Arc<RwLock<SecureChannel>>,
         subscription_state: Arc<RwLock<SubscriptionState>>,
         message_queue: Arc<RwLock<MessageQueue>>,
+        request_timeout: Option<std::time::Duration>,
     ) -> SessionState {
         let id = NEXT_SESSION_ID.fetch_add(1, Ordering::Relaxed);
         let decoding_options = secure_channel.read().decoding_options();
@@ -185,7 +184,7 @@ impl SessionState {
             ignore_clock_skew,
             secure_channel,
             connection_state: ConnectionStateMgr::new(),
-            request_timeout: Self::DEFAULT_REQUEST_TIMEOUT,
+            request_timeout: request_timeout.unwrap_or(std::time::Duration::from_millis(Self::DEFAULT_REQUEST_TIMEOUT as u64)),
             send_buffer_size: Self::SEND_BUFFER_SIZE,
             receive_buffer_size: Self::RECEIVE_BUFFER_SIZE,
             max_message_size: decoding_options.max_message_size,
@@ -231,7 +230,7 @@ impl SessionState {
         self.max_chunk_count
     }
 
-    pub fn request_timeout(&self) -> u32 {
+    pub fn request_timeout(&self) -> std::time::Duration {
         self.request_timeout
     }
 
@@ -284,7 +283,7 @@ impl SessionState {
             request_handle: self.request_handle.next(),
             return_diagnostics: DiagnosticBits::empty(),
             audit_entry_id: UAString::null(),
-            timeout_hint: self.request_timeout,
+            timeout_hint: self.request_timeout.as_millis() as u32,
             additional_header: ExtensionObject::null(),
         }
     }
@@ -400,7 +399,7 @@ impl SessionState {
     async fn wait_for_sync_response(
         &mut self,
         request_handle: u32,
-        request_timeout: u32,
+        request_timeout: std::time::Duration,
         mut receiver: Receiver<SupportedMessage>,
     ) -> Result<SupportedMessage, StatusCode> {
         if request_handle == 0 {
@@ -408,7 +407,6 @@ impl SessionState {
         }
         // Receive messages until the one expected comes back. Publish responses will be consumed
         // silently.
-        let request_timeout = std::time::Duration::from_millis(request_timeout as u64);
         match timeout(request_timeout, receiver.recv()).await {
             Ok(Some(response)) => Ok(response),
             Ok(None) => Err(StatusCode::BadNotConnected),

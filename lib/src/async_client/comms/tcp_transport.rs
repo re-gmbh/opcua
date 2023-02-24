@@ -17,7 +17,7 @@ use std::{
 
 use futures::StreamExt;
 use tokio::{
-    io::{self, AsyncWriteExt, ReadHalf, WriteHalf},
+    io::{AsyncWriteExt, ReadHalf, WriteHalf},
     net::TcpStream,
     sync::mpsc::{UnboundedReceiver, UnboundedSender},
     time::{interval, sleep, Duration},
@@ -388,6 +388,7 @@ impl TcpTransport {
 
         connection_state.set_state(ConnectionState::Connecting);
 
+        // TODO: use request timeout for new connections, too
         match TcpStream::connect(&addr).await {
             Err(err) => {
                 error!("Could not connect to host {}, {:?}", addr, err);
