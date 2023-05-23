@@ -111,7 +111,7 @@ impl Chunker {
         max_chunk_size: usize,
         secure_channel: &SecureChannel,
         supported_message: &SupportedMessage,
-    ) -> std::result::Result<Vec<MessageChunk>, StatusCode> {
+    ) -> Result<Vec<MessageChunk>, StatusCode> {
         let security_policy = secure_channel.security_policy();
         if security_policy == SecurityPolicy::Unknown {
             panic!("Security policy cannot be unknown");

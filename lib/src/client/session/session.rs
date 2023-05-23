@@ -1014,6 +1014,8 @@ impl Session {
                     subscription_state.delete_subscription(subscription_id);
                 }
             }
+            let mut session_state = trace_write_lock!(self.session_state);
+            session_state.set_session_id(NodeId::null());
             Ok(())
         } else {
             session_error!(self, "close_session failed {:?}", response);

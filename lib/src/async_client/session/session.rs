@@ -141,7 +141,7 @@ pub struct Session {
 
 impl Drop for Session {
     fn drop(&mut self) {
-        info!("Session has dropped");
+        info!("Dropping session");
         if self.is_connected() && self.has_session() {
             panic!("Please disconnect the session before dropping");
         }
@@ -934,6 +934,9 @@ impl Session {
                     subscription_state.delete_subscription(subscription_id);
                 }
             }
+            // after sending `CloseSessionRequest`, the session id isn't valid anymore
+            let mut session_state = trace_write_lock!(self.session_state);
+            session_state.set_session_id(NodeId::null());
             Ok(())
         } else {
             session_error!(self, "close_session failed {:?}", response);
