@@ -165,8 +165,8 @@ impl SessionState {
     const FIRST_MONITORED_ITEM_HANDLE: u32 = 1000;
 
     const DEFAULT_REQUEST_TIMEOUT: u32 = 15 * 1000;
-    const SEND_BUFFER_SIZE: usize = 65535;
-    const RECEIVE_BUFFER_SIZE: usize = 65535;
+    const SEND_BUFFER_SIZE: usize = 655350;
+    const RECEIVE_BUFFER_SIZE: usize = 655350;
 
     pub fn new(
         ignore_clock_skew: bool,
