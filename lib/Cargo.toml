@@ -50,7 +50,7 @@ chrono = { version = "0.4", features = ["serde"] }
 parking_lot = { version = "0.12", features = ["send_guard"] }
 futures = "0.3"
 tokio = { version = "1", features = ["full"] }
-tokio-util = { version = "0.6", features = ["codec"] }
+tokio-util = { version = "0.7", features = ["codec"] }
 lazy_static = "1.4.0"
 regex = "1.5"
 serde = "1.0"
@@ -59,7 +59,7 @@ serde_yaml = "0.8"
 serde_json = "1.0"
 bytes = "1.0.1"
 url = "1.6"
-time = "0.1"
+time = "0.3"
 bitflags = "1.2"
 derivative = "1.0"
 byteorder = "1.3"

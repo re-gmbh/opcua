@@ -83,7 +83,6 @@ pub mod prelude {
     };
     pub use crate::types::service_types::*;
     pub use crate::types::status_code::StatusCode;
-    pub use crate::types::*;
 }
 
 pub mod constants {
