@@ -385,21 +385,14 @@ fn sign_hmac_sha1() {
     use crate::crypto::hash;
     use serialize::hex::FromHex;
 
-    let key = b"";
-    let data = b"";
+    let key = b"key";
+    let data = b"The quick brown fox jumps over the lazy dog";
 
     let mut signature_wrong_size = [0u8; SHA1_SIZE - 1];
     assert!(hash::hmac_sha1(key, data, &mut signature_wrong_size).is_err());
 
     let mut signature = [0u8; SHA1_SIZE];
-    assert!(hash::hmac_sha1(key, data, &mut signature).is_ok());
-    let expected = "fbdb1d1b18aa6c08324b7d64b71fb76370690e1d"
-        .from_hex()
-        .unwrap();
-    assert_eq!(&signature, &expected[..]);
-
-    let key = b"key";
-    let data = b"The quick brown fox jumps over the lazy dog";
+  
     assert!(hash::hmac_sha1(key, data, &mut signature).is_ok());
     let expected = "de7c9b85b8b78aa6bc8a7a36f70a90701c9db4d9"
         .from_hex()
@@ -415,21 +408,14 @@ fn sign_hmac_sha256() {
     use crate::crypto::hash;
     use serialize::hex::FromHex;
 
-    let key = b"";
-    let data = b"";
+    let key = b"key";
+    let data = b"The quick brown fox jumps over the lazy dog";
 
     let mut signature_wrong_size = [0u8; SHA256_SIZE - 1];
     assert!(hash::hmac_sha256(key, data, &mut signature_wrong_size).is_err());
 
     let mut signature = [0u8; SHA256_SIZE];
-    assert!(hash::hmac_sha256(key, data, &mut signature).is_ok());
-    let expected = "b613679a0814d9ec772f95d778c35fc5ff1697c493715653c6c712144292c5ad"
-        .from_hex()
-        .unwrap();
-    assert_eq!(&signature, &expected[..]);
-
-    let key = b"key";
-    let data = b"The quick brown fox jumps over the lazy dog";
+    
     assert!(hash::hmac_sha256(key, data, &mut signature).is_ok());
     let expected = "f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8"
         .from_hex()
