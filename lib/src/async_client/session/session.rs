@@ -575,7 +575,7 @@ impl Session {
                 session_state.quit();
             }
 
-            self.transport.wait_for_disconnect();
+            self.transport.wait_for_disconnect().await;
             self.on_connection_status_change(false);
         }
     }
