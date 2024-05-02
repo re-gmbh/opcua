@@ -342,14 +342,14 @@ impl TcpTransport {
     }
 
     /// Disconnects the stream from the server (if it is connected)
-    pub fn wait_for_disconnect(&self) {
+    pub async fn wait_for_disconnect(&self) {
         debug!("Waiting for a disconnect");
         loop {
             if self.connection_state.is_finished() {
                 debug!("Disconnected");
                 break;
             }
-            thread::sleep(Duration::from_millis(Self::WAIT_POLLING_TIMEOUT))
+            sleep(Duration::from_millis(Self::WAIT_POLLING_TIMEOUT)).await;
         }
     }
 
