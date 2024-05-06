@@ -24,7 +24,7 @@ use crate::types::{
 };
 
 /// The kind of identifier, numeric, string, guid or byte
-#[derive(Eq, PartialEq, Clone, Debug, Hash, Serialize, Deserialize)]
+#[derive(Eq, PartialEq, Clone, Debug, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub enum Identifier {
     Numeric(u32),
     String(UAString),
@@ -123,7 +123,7 @@ impl fmt::Display for NodeIdError {
 impl std::error::Error for NodeIdError {}
 
 /// An identifier for a node in the address space of an OPC UA Server.
-#[derive(PartialEq, Eq, Clone, Debug, Hash, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Clone, Debug, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct NodeId {
     /// The index for a namespace
     pub namespace: u16,

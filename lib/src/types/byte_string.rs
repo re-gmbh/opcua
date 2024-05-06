@@ -17,7 +17,7 @@ use crate::types::{
 };
 
 /// A sequence of octets.
-#[derive(Eq, PartialEq, Debug, Clone, Hash, Serialize, Deserialize)]
+#[derive(Eq, PartialEq, Debug, Clone, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct ByteString {
     pub value: Option<Vec<u8>>,
 }

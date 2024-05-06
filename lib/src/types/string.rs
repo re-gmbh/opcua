@@ -23,7 +23,7 @@ use crate::types::{
 /// A string contains UTF-8 encoded characters or a null value. A null value is distinct from
 /// being an empty string so internally, the code maintains that distinction by holding the value
 /// as an `Option<String>`.
-#[derive(Eq, PartialEq, Debug, Clone, Hash, Serialize, Deserialize)]
+#[derive(Eq, PartialEq, Debug, Clone, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct UAString {
     value: Option<String>,
 }
