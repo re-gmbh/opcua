@@ -15,7 +15,7 @@ use uuid::Uuid;
 use crate::types::encoding::*;
 
 /// A Guid is a 16 byte Globally Unique Identifier.
-#[derive(Eq, PartialEq, Clone, Hash)]
+#[derive(Eq, PartialEq, Clone, Hash, PartialOrd, Ord)]
 pub struct Guid {
     uuid: Uuid,
 }
